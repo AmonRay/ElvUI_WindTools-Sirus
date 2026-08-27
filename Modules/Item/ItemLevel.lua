@@ -12,8 +12,10 @@ local EquipmentManager_GetLocationData = EquipmentManager_GetLocationData
 local Item = Item
 local ItemLocation = ItemLocation
 
-local C_AddOns_IsAddOnLoaded = C_AddOns.IsAddOnLoaded
-local C_Item_DoesItemExist = C_Item.DoesItemExist
+local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
+local C_Item_DoesItemExist = (_G.C_Item and _G.C_Item.DoesItemExist) or function(location)
+	return location and location.GetBagAndSlot and location:GetBagAndSlot() ~= nil
+end
 
 local EQUIPMENTFLYOUT_FIRST_SPECIAL_LOCATION = EQUIPMENTFLYOUT_FIRST_SPECIAL_LOCATION
 

@@ -14,10 +14,10 @@ local GetProfessionInfo = GetProfessionInfo
 local GetProfessions = GetProfessions
 local GetServerTime = GetServerTime
 
-local C_Map_GetMapInfo = C_Map.GetMapInfo
-local C_QuestLog_GetTitleForQuestID = C_QuestLog.GetTitleForQuestID
-local C_QuestLog_IsOnQuest = C_QuestLog.IsOnQuest
-local C_QuestLog_IsQuestFlaggedCompleted = C_QuestLog.IsQuestFlaggedCompleted
+local C_Map_GetMapInfo = C_Map and C_Map.GetMapInfo or function(mapID) return { mapID = mapID, name = tostring(mapID) } end
+local C_QuestLog_GetTitleForQuestID = C_QuestLog and C_QuestLog.GetTitleForQuestID or function() return nil end
+local C_QuestLog_IsOnQuest = C_QuestLog and C_QuestLog.IsOnQuest or function() return false end
+local C_QuestLog_IsQuestFlaggedCompleted = C_QuestLog and C_QuestLog.IsQuestFlaggedCompleted or function() return false end
 
 local function GetWorldMapIDSetter(idOrFunc)
 	return function(...)
@@ -31,7 +31,7 @@ local function GetWorldMapIDSetter(idOrFunc)
 end
 
 ET.Meta = {
-	radiantEchoesZoneRotation = { C_Map_GetMapInfo(32), C_Map_GetMapInfo(70), C_Map_GetMapInfo(115) },
+	radiantEchoesZoneRotation = { C_Map_GetMapInfo(32) or { mapID = 32, name = "32" }, C_Map_GetMapInfo(70) or { mapID = 70, name = "70" }, C_Map_GetMapInfo(115) or { mapID = 115, name = "115" } },
 	ProfessionsWeeklyMN = {
 		[4620669] = 93690, -- 炼金术
 		[4620670] = 93691, -- 锻造
@@ -110,7 +110,8 @@ ET.EventList = {
 local function WeeklyName(iconID, name, position)
 	local name = F.GetIconString(iconID, 14, 16, true) .. " " .. name
 	if type(position) == "number" then
-		position = C_Map_GetMapInfo(position).name
+		local mapInfo = C_Map_GetMapInfo(position)
+		position = mapInfo and mapInfo.name or tostring(position)
 	end
 
 	if position then

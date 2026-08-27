@@ -23,12 +23,14 @@ local GetNumGuildMembers = GetNumGuildMembers
 local IsInGuild = IsInGuild
 local MenuUtil_CreateContextMenu = MenuUtil.CreateContextMenu
 
-local C_AddOns_IsAddOnLoaded = C_AddOns.IsAddOnLoaded
-local C_BattleNet_GetFriendAccountInfo = C_BattleNet.GetFriendAccountInfo
-local C_BattleNet_GetFriendGameAccountInfo = C_BattleNet.GetFriendGameAccountInfo
-local C_BattleNet_GetFriendNumGameAccounts = C_BattleNet.GetFriendNumGameAccounts
-local C_FriendList_GetFriendInfoByIndex = C_FriendList.GetFriendInfoByIndex
-local C_FriendList_GetNumOnlineFriends = C_FriendList.GetNumOnlineFriends
+local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
+local C_BattleNet = _G.C_BattleNet
+local C_FriendList = _G.C_FriendList
+local C_BattleNet_GetFriendAccountInfo = C_BattleNet and C_BattleNet.GetFriendAccountInfo or function() return nil end
+local C_BattleNet_GetFriendGameAccountInfo = C_BattleNet and C_BattleNet.GetFriendGameAccountInfo or function() return nil end
+local C_BattleNet_GetFriendNumGameAccounts = C_BattleNet and C_BattleNet.GetFriendNumGameAccounts or function() return 0 end
+local C_FriendList_GetFriendInfoByIndex = C_FriendList and C_FriendList.GetFriendInfoByIndex or GetFriendInfo
+local C_FriendList_GetNumOnlineFriends = C_FriendList and C_FriendList.GetNumOnlineFriends or GetNumFriendsOnline
 
 local LOCALIZED_CLASS_NAMES_FEMALE = LOCALIZED_CLASS_NAMES_FEMALE
 local LOCALIZED_CLASS_NAMES_MALE = LOCALIZED_CLASS_NAMES_MALE

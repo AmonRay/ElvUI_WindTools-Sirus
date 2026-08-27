@@ -16,9 +16,9 @@ local pairs = pairs
 local tonumber = tonumber
 local tostring = tostring
 
-local C_CVar_GetCVar = C_CVar.GetCVar
-local C_CVar_GetCVarBool = C_CVar.GetCVarBool
-local C_CVar_SetCVar = C_CVar.SetCVar
+local C_CVar_GetCVar = W.Compatibility.GetCVar
+local C_CVar_GetCVarBool = W.Compatibility.GetCVarBool
+local C_CVar_SetCVar = W.Compatibility.SetCVar
 
 options.general = {
 	order = 1,

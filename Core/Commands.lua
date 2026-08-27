@@ -14,13 +14,14 @@ local strupper = strupper
 local type = type
 local wipe = wipe
 
-local C_AddOns_DisableAddOn = C_AddOns.DisableAddOn
-local C_AddOns_EnableAddOn = C_AddOns.EnableAddOn
-local C_AddOns_GetNumAddOns = C_AddOns.GetNumAddOns
-
-local C_AddOns_GetAddOnInfo = C_AddOns.GetAddOnInfo
-local C_CVar_SetCVar = C_CVar.SetCVar
-local C_UI_Reload = C_UI.Reload
+local Compatibility = W.Compatibility
+local C_AddOns = _G.C_AddOns
+local C_AddOns_DisableAddOn = (C_AddOns and C_AddOns.DisableAddOn) or DisableAddOn
+local C_AddOns_EnableAddOn = (C_AddOns and C_AddOns.EnableAddOn) or EnableAddOn
+local C_AddOns_GetNumAddOns = (C_AddOns and C_AddOns.GetNumAddOns) or GetNumAddOns
+local C_AddOns_GetAddOnInfo = (C_AddOns and C_AddOns.GetAddOnInfo) or GetAddOnInfo
+local C_CVar_SetCVar = Compatibility.SetCVar
+local C_UI_Reload = Compatibility.ReloadUI
 
 ---Registers a new command with the WindTools addon system
 ---@param name string The name/identifier for the command

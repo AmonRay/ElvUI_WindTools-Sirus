@@ -6,7 +6,8 @@ local format = format
 local gsub = gsub
 local tostring = tostring
 
-local C_Spell_GetSpellLink = C_Spell.GetSpellLink
+local C_Spell = _G.C_Spell
+local C_Spell_GetSpellLink = C_Spell and C_Spell.GetSpellLink or GetSpellLink
 
 local function FormatMessage(message, spellID)
 	message = gsub(message, "%%player%%", E.name)

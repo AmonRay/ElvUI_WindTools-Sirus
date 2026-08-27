@@ -13,9 +13,9 @@ local GetNumQuestLeaderBoards = GetNumQuestLeaderBoards
 local GetQuestID = GetQuestID
 local GetQuestLogLeaderBoard = GetQuestLogLeaderBoard
 
-local C_QuestInfoSystem_GetQuestRewardSpells = C_QuestInfoSystem.GetQuestRewardSpells
-local C_QuestLog_GetNextWaypointText = C_QuestLog.GetNextWaypointText
-local C_QuestLog_GetSelectedQuest = C_QuestLog.GetSelectedQuest
+local C_QuestInfoSystem_GetQuestRewardSpells = C_QuestInfoSystem and C_QuestInfoSystem.GetQuestRewardSpells or function() return {} end
+local C_QuestLog_GetNextWaypointText = C_QuestLog and C_QuestLog.GetNextWaypointText or function() return nil end
+local C_QuestLog_GetSelectedQuest = C_QuestLog and C_QuestLog.GetSelectedQuest or function() return nil end
 
 local QUEST_OBJECTIVE_COMPLETED_FONT_COLOR = QUEST_OBJECTIVE_COMPLETED_FONT_COLOR
 local MAX_OBJECTIVES = MAX_OBJECTIVES

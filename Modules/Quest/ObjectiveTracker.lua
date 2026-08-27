@@ -62,7 +62,11 @@ function OT:SortQuestWatches()
 	F.WaitFor(function()
 		return _G.C_QuestLog ~= nil
 	end, function()
-		_G.C_QuestLog.SortQuestWatches()
+		if _G.C_QuestLog and _G.C_QuestLog.SortQuestWatches then
+			_G.C_QuestLog.SortQuestWatches()
+		elseif SortQuestWatches then
+			SortQuestWatches()
+		end
 	end)
 end
 

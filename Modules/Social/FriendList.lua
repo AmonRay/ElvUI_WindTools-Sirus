@@ -14,9 +14,9 @@ local GetClassInfo = GetClassInfo
 local GetQuestDifficultyColor = GetQuestDifficultyColor
 local TimerunningUtil_AddSmallIcon = TimerunningUtil.AddSmallIcon
 
-local C_BattleNet_GetFriendAccountInfo = C_BattleNet.GetFriendAccountInfo
-local C_ClassColor_GetClassColor = C_ClassColor.GetClassColor
-local C_FriendList_GetFriendInfoByIndex = C_FriendList.GetFriendInfoByIndex
+local C_BattleNet_GetFriendAccountInfo = C_BattleNet and C_BattleNet.GetFriendAccountInfo or function() return nil end
+local C_ClassColor_GetClassColor = C_ClassColor and C_ClassColor.GetClassColor or function() return { r = 1, g = 1, b = 1 } end
+local C_FriendList_GetFriendInfoByIndex = C_FriendList and C_FriendList.GetFriendInfoByIndex or GetFriendInfo or function() return nil end
 
 local BNET_FRIEND_TOOLTIP_WOW_CLASSIC = BNET_FRIEND_TOOLTIP_WOW_CLASSIC
 local FRIENDS_BUTTON_TYPE_BNET = FRIENDS_BUTTON_TYPE_BNET
@@ -569,9 +569,11 @@ function FL:ProfileUpdate()
 	end
 
 	FriendsFrame_Update()
-	_G.RecentAlliesFrame.List.ScrollBox:ForEachFrame(function(button)
-		self:UpdateRecentAllyButton(button)
-	end)
+	if _G.RecentAlliesFrame and _G.RecentAlliesFrame.List and _G.RecentAlliesFrame.List.ScrollBox then
+		_G.RecentAlliesFrame.List.ScrollBox:ForEachFrame(function(button)
+			self:UpdateRecentAllyButton(button)
+		end)
+	end
 end
 
 W:RegisterModule(FL:GetName())

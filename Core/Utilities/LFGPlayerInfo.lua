@@ -16,9 +16,10 @@ local tostring = tostring
 local GetClassInfo = GetClassInfo
 local GetSpecializationInfoForClassID = GetSpecializationInfoForClassID
 
-local C_LFGList_GetActivityInfoTable = C_LFGList.GetActivityInfoTable
-local C_LFGList_GetSearchResultInfo = C_LFGList.GetSearchResultInfo
-local C_LFGList_GetSearchResultPlayerInfo = C_LFGList.GetSearchResultPlayerInfo
+local C_LFGList = _G.C_LFGList
+local C_LFGList_GetActivityInfoTable = C_LFGList and C_LFGList.GetActivityInfoTable or function() return nil end
+local C_LFGList_GetSearchResultInfo = C_LFGList and C_LFGList.GetSearchResultInfo or function() return nil end
+local C_LFGList_GetSearchResultPlayerInfo = C_LFGList and C_LFGList.GetSearchResultPlayerInfo or function() return nil end
 
 local GROUP_FINDER_CATEGORY_ID_DUNGEONS = GROUP_FINDER_CATEGORY_ID_DUNGEONS
 local LOCALIZED_CLASS_NAMES_MALE = LOCALIZED_CLASS_NAMES_MALE

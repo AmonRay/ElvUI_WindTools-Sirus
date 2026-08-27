@@ -4,7 +4,7 @@ local M = W.Modules.Misc ---@class Misc
 local CreateFrame = CreateFrame
 local IsInInstance = IsInInstance
 
-local C_CVar_SetCVar = C_CVar.SetCVar
+local C_CVar_SetCVar = W.Compatibility.SetCVar
 
 local function toggleChatBubbles()
 	C_CVar_SetCVar("chatBubbles", IsInInstance() and 1 or 0)

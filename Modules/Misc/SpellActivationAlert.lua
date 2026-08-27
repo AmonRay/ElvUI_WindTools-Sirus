@@ -6,16 +6,15 @@ local _G = _G
 local pairs = pairs
 local tonumber = tonumber
 
-local C_CVar_GetCVar = C_CVar.GetCVar
-local Enum_ScreenLocationType = Enum.ScreenLocationType
+local C_CVar_GetCVar = W.Compatibility.GetCVar
+local Enum_ScreenLocationType = _G.Enum and _G.Enum.ScreenLocationType or {}
 
 function SA:Update()
-	if not self.db then
+	if not self.db or not _G.SpellActivationOverlayFrame then
 		return
 	end
 
-	local scale = self.db.enable and self.db.scale or 1
-	_G.SpellActivationOverlayFrame:SetScale(scale)
+	local scale = self.db.enable and self.db.scale or 1		_G.SpellActivationOverlayFrame:SetScale(scale)
 
 	local opacityCVar = C_CVar_GetCVar("spellActivationOverlayOpacity")
 	local opacity = opacityCVar and tonumber(opacityCVar)
@@ -35,6 +34,10 @@ local previewData = {
 }
 
 function SA:Preview()
+	if not _G.SpellActivationOverlayFrame then
+		return
+	end
+
 	for position, data in pairs(previewData) do
 		_G.SpellActivationOverlayFrame:ShowOverlay(data.spellID, data.textureID, position, 1, 255, 255, 255)
 	end

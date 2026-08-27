@@ -11,8 +11,8 @@ local type = type
 
 local GetTime = GetTime
 
-local C_AddOns_DoesAddOnExist = C_AddOns.DoesAddOnExist
-local C_Spell_GetSpellTexture = C_Spell.GetSpellTexture
+local C_AddOns_DoesAddOnExist = W.Compatibility.DoesAddOnExist
+local C_Spell_GetSpellTexture = W.Compatibility.GetSpellTexture
 
 local RED_FONT_COLOR = RED_FONT_COLOR
 local YELLOW_FONT_COLOR = YELLOW_FONT_COLOR

@@ -15,11 +15,11 @@ local wipe = wipe
 local EventRegistry = EventRegistry
 local Pool_HideAndClearAnchors = Pool_HideAndClearAnchors
 
-local C_AddOns_IsAddOnLoaded = C_AddOns.IsAddOnLoaded
-local C_MapExplorationInfo_GetExploredMapTextures = C_MapExplorationInfo.GetExploredMapTextures
-local C_Map_GetMapArtID = C_Map.GetMapArtID
-local C_Map_GetMapArtLayers = C_Map.GetMapArtLayers
-local C_Map_GetMapInfo = C_Map.GetMapInfo
+local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
+local C_MapExplorationInfo_GetExploredMapTextures = C_MapExplorationInfo and C_MapExplorationInfo.GetExploredMapTextures or function() return nil end
+local C_Map_GetMapArtID = C_Map and C_Map.GetMapArtID or function() return nil end
+local C_Map_GetMapArtLayers = C_Map and C_Map.GetMapArtLayers or function() return nil end
+local C_Map_GetMapInfo = C_Map and C_Map.GetMapInfo or function() return nil end
 
 -- STRUCTURE:
 -- UiMapArtID = {

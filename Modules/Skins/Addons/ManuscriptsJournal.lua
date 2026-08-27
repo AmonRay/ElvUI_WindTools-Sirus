@@ -8,7 +8,7 @@ local select = select
 local unpack = unpack
 
 local RunNextFrame = RunNextFrame
-local C_Item_GetItemInfo = C_Item.GetItemInfo
+local C_Item_GetItemInfo = W.Compatibility.GetItemInfo
 
 local ITEM_QUALITY_COLORS = ITEM_QUALITY_COLORS
 

@@ -9,11 +9,12 @@ local select = select
 local strsplit = strsplit
 local tonumber = tonumber
 
-local C_QuestLog_GetInfo = C_QuestLog.GetInfo
-local C_QuestLog_GetLogIndexForQuestID = C_QuestLog.GetLogIndexForQuestID
-local TooltipDataProcessor_AddTooltipPostCall = TooltipDataProcessor.AddTooltipPostCall
+local Compatibility = W.Compatibility
+local C_QuestLog_GetInfo = C_QuestLog and C_QuestLog.GetInfo
+local C_QuestLog_GetLogIndexForQuestID = C_QuestLog and C_QuestLog.GetLogIndexForQuestID
+local TooltipDataProcessor_AddTooltipPostCall = _G.TooltipDataProcessor and _G.TooltipDataProcessor.AddTooltipPostCall
 
-local Enum_TooltipDataType_Unit = Enum.TooltipDataType.Unit
+local Enum_TooltipDataType_Unit = _G.Enum and _G.Enum.TooltipDataType and _G.Enum.TooltipDataType.Unit
 
 local accuracy
 
@@ -52,6 +53,9 @@ local function AddObjectiveProgress(tt, data)
 end
 
 function T:ObjectiveProgress()
+	if not TooltipDataProcessor_AddTooltipPostCall or not Enum_TooltipDataType_Unit or not C_QuestLog_GetInfo or not C_QuestLog_GetLogIndexForQuestID then
+		return
+	end
 	if not E.private.WT.tooltips.objectiveProgress.enable then
 		return
 	end

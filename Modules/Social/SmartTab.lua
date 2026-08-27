@@ -22,7 +22,7 @@ local UnitInBattleground = UnitInBattleground
 local UnitIsGroupAssistant = UnitIsGroupAssistant
 local UnitIsGroupLeader = UnitIsGroupLeader
 
-local C_GuildInfo_IsGuildOfficer = C_GuildInfo.IsGuildOfficer
+local C_GuildInfo_IsGuildOfficer = C_GuildInfo and C_GuildInfo.IsGuildOfficer or function() return false end
 
 local LE_PARTY_CATEGORY_HOME = LE_PARTY_CATEGORY_HOME
 local LE_PARTY_CATEGORY_INSTANCE = LE_PARTY_CATEGORY_INSTANCE

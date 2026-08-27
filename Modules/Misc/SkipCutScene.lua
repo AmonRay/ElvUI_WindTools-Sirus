@@ -8,10 +8,10 @@ local hooksecurefunc = hooksecurefunc
 local time = time
 
 local CinematicFrame_CancelCinematic = CinematicFrame_CancelCinematic
-local EventRegistry = EventRegistry
+local EventRegistry = _G.EventRegistry
 local IsModifierKeyDown = IsModifierKeyDown
 
-local Enum_CinematicType_GameMovie = Enum.CinematicType.GameMovie
+local Enum_CinematicType_GameMovie = _G.Enum and _G.Enum.CinematicType and _G.Enum.CinematicType.GameMovie
 
 local initialized = false
 local forceSkipMovie = false
@@ -74,7 +74,7 @@ end
 
 function M:MovieCinematicStarted(movieType, movieID)
 	-- /run MovieFrame_PlayMovie(MovieFrame, 993)
-	if not E.private.WT or movieType ~= Enum_CinematicType_GameMovie then
+	if not E.private.WT or not Enum_CinematicType_GameMovie or movieType ~= Enum_CinematicType_GameMovie then
 		return
 	end
 
@@ -141,8 +141,10 @@ function M:SkipCutScene()
 
 	self:AddCutSceneReplayCustomLink()
 	self:SecureHook("CinematicStarted", "MovieCinematicStarted") -- Movie
-	EventRegistry:RegisterCallback("CinematicFrame.CinematicStarting", CinematicFrame_CinematicStarting_Callback) -- Cinematic
-	EventRegistry:RegisterCallback("Subtitles.OnMovieCinematicPlay", Subtitles_OnMovieCinematicPlay_Callback) -- Subtitles
+	if EventRegistry and EventRegistry.RegisterCallback then
+		EventRegistry:RegisterCallback("CinematicFrame.CinematicStarting", CinematicFrame_CinematicStarting_Callback) -- Cinematic
+		EventRegistry:RegisterCallback("Subtitles.OnMovieCinematicPlay", Subtitles_OnMovieCinematicPlay_Callback) -- Subtitles
+	end
 
 	initialized = true
 end

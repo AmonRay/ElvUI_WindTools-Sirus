@@ -12,8 +12,8 @@ local CreateFrame = CreateFrame
 local GetInstanceInfo = GetInstanceInfo
 local IsInInstance = IsInInstance
 
-local C_AddOns_IsAddOnLoaded = C_AddOns.IsAddOnLoaded
-local C_ChallengeMode_GetActiveKeystoneInfo = C_ChallengeMode.GetActiveKeystoneInfo
+local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
+local C_ChallengeMode_GetActiveKeystoneInfo = (_G.C_ChallengeMode and _G.C_ChallengeMode.GetActiveKeystoneInfo) or function() return nil end
 
 function ID:UpdateFrame()
 	local inInstance, instanceType = IsInInstance()

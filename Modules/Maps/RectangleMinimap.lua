@@ -15,7 +15,7 @@ local tremove = tremove
 local InCombatLockdown = InCombatLockdown
 local Minimap = _G.Minimap
 
-local C_AddOns_IsAddOnLoaded = C_AddOns.IsAddOnLoaded
+local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
 
 function RM:SetHereBeDragonsPinShown(pin, isShown)
 	local forceShown = not self.db or not self.db.enable or not self.db.fixHereBeDragons

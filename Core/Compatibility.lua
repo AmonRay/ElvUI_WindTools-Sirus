@@ -14,7 +14,7 @@ local type = type
 
 local CreateFrame = CreateFrame
 
-local C_AddOns_IsAddOnLoaded = C_AddOns.IsAddOnLoaded
+local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
 
 function W:ConstructCompatibilityFrame()
 	local frame = CreateFrame("Frame", "WTCompatibilityFrame", E.UIParent)

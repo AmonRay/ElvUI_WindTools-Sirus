@@ -14,17 +14,17 @@ local tonumber = tonumber
 local type = type
 local unpack = unpack
 
-local UiMapPoint_CreateFromCoordinates = UiMapPoint.CreateFromCoordinates
+local UiMapPoint_CreateFromCoordinates = UiMapPoint and UiMapPoint.CreateFromCoordinates or function() return nil end
 
-local C_AddOns_IsAddOnLoaded = C_AddOns.IsAddOnLoaded
-local C_Map_CanSetUserWaypointOnMap = C_Map.CanSetUserWaypointOnMap
-local C_Map_ClearUserWaypoint = C_Map.ClearUserWaypoint
-local C_Map_GetBestMapForUnit = C_Map.GetBestMapForUnit
-local C_Map_GetMapInfo = C_Map.GetMapInfo
-local C_Map_HasUserWaypoint = C_Map.HasUserWaypoint
-local C_Map_SetUserWaypoint = C_Map.SetUserWaypoint
-local C_Navigation_GetDistance = C_Navigation.GetDistance
-local C_SuperTrack_SetSuperTrackedUserWaypoint = C_SuperTrack.SetSuperTrackedUserWaypoint
+local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
+local C_Map_CanSetUserWaypointOnMap = C_Map and C_Map.CanSetUserWaypointOnMap or function() return false end
+local C_Map_ClearUserWaypoint = C_Map and C_Map.ClearUserWaypoint or function() end
+local C_Map_GetBestMapForUnit = C_Map and C_Map.GetBestMapForUnit or function() return nil end
+local C_Map_GetMapInfo = C_Map and C_Map.GetMapInfo or function() return nil end
+local C_Map_HasUserWaypoint = C_Map and C_Map.HasUserWaypoint or function() return false end
+local C_Map_SetUserWaypoint = C_Map and C_Map.SetUserWaypoint or function() end
+local C_Navigation_GetDistance = C_Navigation and C_Navigation.GetDistance or function() return 0 end
+local C_SuperTrack_SetSuperTrackedUserWaypoint = C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint or function() end
 
 function ST:ReskinDistanceText()
 	if not _G.SuperTrackedFrame or not _G.SuperTrackedFrame.DistanceText then

@@ -16,12 +16,14 @@ local GetUnitName = GetUnitName
 local IsInGroup = IsInGroup
 local UnitIsPlayer = UnitIsPlayer
 
-local C_Container_GetContainerItemID = C_Container.GetContainerItemID
-local C_Container_GetContainerItemLink = C_Container.GetContainerItemLink
-local C_Container_GetContainerNumSlots = C_Container.GetContainerNumSlots
-local C_Item_IsItemKeystoneByID = C_Item.IsItemKeystoneByID
-local C_MythicPlus_GetOwnedKeystoneChallengeMapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID
-local C_MythicPlus_GetOwnedKeystoneLevel = C_MythicPlus.GetOwnedKeystoneLevel
+local Compatibility = W.Compatibility
+local C_Container_GetContainerItemID = Compatibility.GetContainerItemID
+local C_Container_GetContainerItemLink = Compatibility.GetContainerItemLink
+local C_Container_GetContainerNumSlots = Compatibility.GetContainerNumSlots
+local C_Item_IsItemKeystoneByID = (_G.C_Item and _G.C_Item.IsItemKeystoneByID) or function() return false end
+local C_MythicPlus = _G.C_MythicPlus
+local C_MythicPlus_GetOwnedKeystoneChallengeMapID = C_MythicPlus and C_MythicPlus.GetOwnedKeystoneChallengeMapID or function() return nil end
+local C_MythicPlus_GetOwnedKeystoneLevel = C_MythicPlus and C_MythicPlus.GetOwnedKeystoneLevel or function() return nil end
 
 local LE_PARTY_CATEGORY_HOME = LE_PARTY_CATEGORY_HOME
 local NUM_BAG_SLOTS = NUM_BAG_SLOTS

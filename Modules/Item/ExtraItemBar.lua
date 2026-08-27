@@ -31,16 +31,19 @@ local InCombatLockdown = InCombatLockdown
 local RegisterStateDriver = RegisterStateDriver
 local UnregisterStateDriver = UnregisterStateDriver
 
-local C_Item_GetItemCooldown = C_Item.GetItemCooldown
-local C_Item_GetItemCount = C_Item.GetItemCount
-local C_Item_GetItemInfoInstant = C_Item.GetItemInfoInstant
-local C_Item_IsItemInRange = C_Item.IsItemInRange
-local C_Item_IsUsableItem = C_Item.IsUsableItem
-local C_QuestLog_GetDistanceSqToQuest = C_QuestLog.GetDistanceSqToQuest
-local C_QuestLog_GetNumQuestLogEntries = C_QuestLog.GetNumQuestLogEntries
-local C_QuestLog_GetQuestIDForLogIndex = C_QuestLog.GetQuestIDForLogIndex
-local C_Timer_NewTicker = C_Timer.NewTicker
-local C_TradeSkillUI_GetItemReagentQualityInfo = C_TradeSkillUI.GetItemReagentQualityInfo
+local C_Item = _G.C_Item
+local C_QuestLog = _G.C_QuestLog
+local C_TradeSkillUI = _G.C_TradeSkillUI
+local C_Item_GetItemCooldown = C_Item and C_Item.GetItemCooldown or GetInventoryItemCooldown
+local C_Item_GetItemCount = C_Item and C_Item.GetItemCount or function(itemID) return GetItemCount(itemID) end
+local C_Item_GetItemInfoInstant = W.Compatibility.GetItemInfoInstant
+local C_Item_IsItemInRange = C_Item and C_Item.IsItemInRange or function() return nil end
+local C_Item_IsUsableItem = C_Item and C_Item.IsUsableItem or function() return true end
+local C_QuestLog_GetDistanceSqToQuest = C_QuestLog and C_QuestLog.GetDistanceSqToQuest or function() return nil end
+local C_QuestLog_GetNumQuestLogEntries = C_QuestLog and C_QuestLog.GetNumQuestLogEntries or GetNumQuestLogEntries
+local C_QuestLog_GetQuestIDForLogIndex = C_QuestLog and C_QuestLog.GetQuestIDForLogIndex or function() return nil end
+local C_Timer_NewTicker = W.Compatibility.HasTimerAPI and _G.C_Timer.NewTicker
+local C_TradeSkillUI_GetItemReagentQualityInfo = C_TradeSkillUI and C_TradeSkillUI.GetItemReagentQualityInfo or function() return nil end
 
 local questItemList = {}
 local function UpdateQuestItemList()
@@ -717,7 +720,10 @@ function EB:UpdateBar(id)
 		end
 	end
 
-	bar.waitGroup.ticker = C_Timer_NewTicker(0.1, function()
+	if not C_Timer_NewTicker then
+		bar.waitGroup.count = 0
+	end
+	bar.waitGroup.ticker = C_Timer_NewTicker and C_Timer_NewTicker(0.1, function()
 		if bar.waitGroup.count == 0 then
 			if bar.waitGroup.ticker then
 				bar.waitGroup.ticker:Cancel()

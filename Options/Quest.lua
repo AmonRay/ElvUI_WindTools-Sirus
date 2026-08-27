@@ -16,7 +16,7 @@ local pairs = pairs
 local tonumber = tonumber
 local tostring = tostring
 
-local C_QuestLog_SortQuestWatches = C_QuestLog.SortQuestWatches
+local C_QuestLog_SortQuestWatches = C_QuestLog and C_QuestLog.SortQuestWatches or function() end
 
 local customListSelected
 

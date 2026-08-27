@@ -17,7 +17,7 @@ local InCombatLockdown = InCombatLockdown
 local RegisterStateDriver = RegisterStateDriver
 local UnregisterStateDriver = UnregisterStateDriver
 
-local C_AddOns_IsAddOnLoaded = C_AddOns.IsAddOnLoaded
+local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
 
 local TargetToWorld = {
 	[1] = 5,

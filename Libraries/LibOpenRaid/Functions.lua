@@ -12,7 +12,7 @@ local openRaidLib = LibStub:GetLibrary("LibOpenRaid-1.0")
 
 -- TWW compat
 -- TODO: Remove when TWW is released
-local GetItemInfo = GetItemInfo or C_Item.GetItemInfo
+local GetItemInfo = GetItemInfo or (C_Item and C_Item.GetItemInfo)
 
 local CONST_FRACTION_OF_A_SECOND = 0.01
 
@@ -473,7 +473,7 @@ function openRaidLib.GetFoodTierFromAura(auraInfo)
 end
 
 local isTierPiece = function(itemLink)
-    local tooltipData = C_TooltipInfo.GetHyperlink(itemLink)
+    local tooltipData = C_TooltipInfo and C_TooltipInfo.GetHyperlink and C_TooltipInfo.GetHyperlink(itemLink)
     if (tooltipData) then
         local lines = tooltipData.lines
         if (lines and #lines > 0) then

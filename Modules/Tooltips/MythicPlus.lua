@@ -10,16 +10,20 @@ local pairs = pairs
 
 local UnitGUID = UnitGUID
 
-local C_ChallengeMode_GetDungeonScoreRarityColor = C_ChallengeMode.GetDungeonScoreRarityColor
+local C_ChallengeMode_GetDungeonScoreRarityColor = C_ChallengeMode and C_ChallengeMode.GetDungeonScoreRarityColor or function() return nil end
 local C_ChallengeMode_GetSpecificDungeonOverallScoreRarityColor =
-	C_ChallengeMode.GetSpecificDungeonOverallScoreRarityColor
-local C_PlayerInfo_GetPlayerMythicPlusRatingSummary = C_PlayerInfo.GetPlayerMythicPlusRatingSummary
+	C_ChallengeMode and C_ChallengeMode.GetSpecificDungeonOverallScoreRarityColor or function() return nil end
+local C_PlayerInfo_GetPlayerMythicPlusRatingSummary =
+	C_PlayerInfo and C_PlayerInfo.GetPlayerMythicPlusRatingSummary or function() return nil end
 
 local HIGHLIGHT_FONT_COLOR = HIGHLIGHT_FONT_COLOR
 
 local mythicPlusDataCache = {}
 
 function T:GetMythicPlusData(unit)
+	if not W.Compatibility.HasMythicPlusAPI or not C_PlayerInfo or not C_PlayerInfo_GetPlayerMythicPlusRatingSummary then
+		return
+	end
 	local guid = UnitGUID(unit)
 	if E:IsSecretValue(guid) or not guid then
 		return

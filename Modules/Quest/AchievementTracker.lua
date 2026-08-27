@@ -40,17 +40,17 @@ local GetCategoryNumAchievements = GetCategoryNumAchievements
 local GetKeysArray = GetKeysArray
 local PlaySound = PlaySound
 
-local C_AchievementInfo_GetRewardItemID = C_AchievementInfo.GetRewardItemID
-local C_AchievementInfo_IsGuildAchievement = C_AchievementInfo.IsGuildAchievement
-local C_AchievementInfo_IsValidAchievement = C_AchievementInfo.IsValidAchievement
-local C_ContentTracking_GetTrackedIDs = C_ContentTracking.GetTrackedIDs
-local C_ContentTracking_IsTracking = C_ContentTracking.IsTracking
-local C_ContentTracking_StartTracking = C_ContentTracking.StartTracking
-local C_ContentTracking_StopTracking = C_ContentTracking.StopTracking
+local C_AchievementInfo_GetRewardItemID = C_AchievementInfo and C_AchievementInfo.GetRewardItemID or function() return nil end
+local C_AchievementInfo_IsGuildAchievement = C_AchievementInfo and C_AchievementInfo.IsGuildAchievement or function() return false end
+local C_AchievementInfo_IsValidAchievement = C_AchievementInfo and C_AchievementInfo.IsValidAchievement or function() return false end
+local C_ContentTracking_GetTrackedIDs = C_ContentTracking and C_ContentTracking.GetTrackedIDs or function() return {} end
+local C_ContentTracking_IsTracking = C_ContentTracking and C_ContentTracking.IsTracking or function() return false end
+local C_ContentTracking_StartTracking = C_ContentTracking and C_ContentTracking.StartTracking or function() end
+local C_ContentTracking_StopTracking = C_ContentTracking and C_ContentTracking.StopTracking or function() end
 
 local Constants_ContentTrackingConsts = Constants.ContentTrackingConsts
-local Enum_ContentTrackingStopType = Enum.ContentTrackingStopType
-local Enum_ContentTrackingType = Enum.ContentTrackingType
+local Enum_ContentTrackingStopType = _G.Enum and _G.Enum.ContentTrackingStopType or {}
+local Enum_ContentTrackingType = _G.Enum and _G.Enum.ContentTrackingType or {}
 local RED_FONT_COLOR = RED_FONT_COLOR
 local SOUNDKIT = SOUNDKIT
 local ScrollBoxConstants = ScrollBoxConstants

@@ -68,8 +68,15 @@ local isExpansion_Dragonflight = function()
 	end
 end
 
---don't load if it's not retail, emergencial patch due to classic and bcc stuff not transposed yet
-if (WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE and not isExpansion_Dragonflight()) then
+-- WindTools may load on the modified Wrath client, but only the legacy-safe
+-- subset is enabled there. Retail data collectors remain disabled by default.
+local isWindToolsWrath = WOW_PROJECT_ID == WOW_PROJECT_WRATH_CLASSIC or toc < 100000
+-- The current WindTools profile does not enable OpenRaid on Wrath by default.
+-- It is loaded only when explicitly opted in after client runtime verification.
+if isWindToolsWrath then
+    return
+end
+if (WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE and not isExpansion_Dragonflight() and not isWindToolsWrath) then
     return
 end
 
@@ -174,9 +181,9 @@ end
     -- Real throttle is 10 messages per 1 second, but we want to be safe due to fact we dont know when it actually resets
     local CONST_COMM_BURST_BUFFER_COUNT = 9
 
-    local GetContainerNumSlots = GetContainerNumSlots or C_Container.GetContainerNumSlots
-    local GetContainerItemID = GetContainerItemID or C_Container.GetContainerItemID
-    local GetContainerItemLink = GetContainerItemLink or C_Container.GetContainerItemLink
+    local GetContainerNumSlots = GetContainerNumSlots or (C_Container and C_Container.GetContainerNumSlots)
+    local GetContainerItemID = GetContainerItemID or (C_Container and C_Container.GetContainerItemID)
+    local GetContainerItemLink = GetContainerItemLink or (C_Container and C_Container.GetContainerItemLink)
 
     --from vanilla to cataclysm, the specID did not existed, hence its considered version 0
     --for mists of pandaria and beyond it's version 1
@@ -268,8 +275,10 @@ end
 --use a console variable to create a flash cache to keep data while the game reload
 --this is not a long term database as saved variables are and it get clean up often
 
-C_CVar.RegisterCVar(CONST_CVAR_TEMPCACHE)
-C_CVar.RegisterCVar(CONST_CVAR_TEMPCACHE_DEBUG)
+if C_CVar and C_CVar.RegisterCVar then
+    C_CVar.RegisterCVar(CONST_CVAR_TEMPCACHE)
+    C_CVar.RegisterCVar(CONST_CVAR_TEMPCACHE_DEBUG)
+end
 
 --internal namespace
 local tempCache = {
@@ -310,7 +319,7 @@ function tempCache.SaveCacheOnCVar(data)
 end
 
 function tempCache.RestoreData()
-    local data = C_CVar.GetCVar(CONST_CVAR_TEMPCACHE)
+    local data = C_CVar and C_CVar.GetCVar and C_CVar.GetCVar(CONST_CVAR_TEMPCACHE)
     if (data and type(data) == "string" and string.len(data) > 2) then
         local LibAceSerializer = LibStub:GetLibrary("AceSerializer-3.0", true)
         if (LibAceSerializer) then
@@ -682,7 +691,7 @@ end
             LIB_OPEN_RAID_COMM_SCHEDULER:Cancel();
         end
 
-        local newTickerHandle = C_Timer.NewTicker(0.05, function()
+        local newTickerHandle = C_Timer and C_Timer.NewTicker and C_Timer.NewTicker(0.05, function()
             local serverTime = GetServerTime();
 
             -- Replenish the counter if last server time is not the same as the last throttle update
@@ -807,7 +816,8 @@ end
     --create a new schedule
     function openRaidLib.Schedules.NewTimer(time, callback, bCanRunWithoutGroup, ...)
         local payload = {...}
-        local newTimer = C_Timer.NewTimer(time, triggerScheduledTick)
+        local newTimer = C_Timer and C_Timer.NewTimer and C_Timer.NewTimer(time, triggerScheduledTick)
+        if not newTimer then return end
         newTimer.bCanRunWithoutGroup = bCanRunWithoutGroup
         newTimer.payload = payload
         newTimer.callback = callback

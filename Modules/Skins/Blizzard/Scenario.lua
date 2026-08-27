@@ -11,7 +11,7 @@ local unpack = unpack
 local CreateFrame = CreateFrame
 local GetInstanceInfo = GetInstanceInfo
 
-local C_ChallengeMode_GetAffixInfo = C_ChallengeMode.GetAffixInfo
+local C_ChallengeMode_GetAffixInfo = C_ChallengeMode and C_ChallengeMode.GetAffixInfo or function() return nil end
 
 local function SkinMawBuffsContainer(container)
 	container:StripTextures()

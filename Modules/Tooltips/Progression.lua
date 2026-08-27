@@ -33,7 +33,7 @@ local UnitLevel = UnitLevel
 local UnitName = UnitName
 local UnmuteSoundFile = UnmuteSoundFile
 
-local C_AddOns_IsAddOnLoaded = C_AddOns.IsAddOnLoaded
+local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
 
 local MAX_PLAYER_LEVEL = GetMaxLevelForPlayerExpansion()
 

@@ -53,7 +53,7 @@ local interfaceVersion = select(4, GetBuildInfo())
 local isRetail = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE
 local isEra = WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
 local isTBC = WOW_PROJECT_ID == WOW_PROJECT_BURNING_CRUSADE_CLASSIC
-local isWrath = WOW_PROJECT_ID == WOW_PROJECT_WRATH_CLASSIC
+local isWrath = WOW_PROJECT_ID == WOW_PROJECT_WRATH_CLASSIC or interfaceVersion < 100000
 local isCata = WOW_PROJECT_ID == WOW_PROJECT_CATACLYSM_CLASSIC
 local isMidnight = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE and interfaceVersion >= 120000
 
@@ -71,9 +71,12 @@ local tinsert = tinsert
 local tremove = tremove
 local tostring = tostring
 local setmetatable = setmetatable
-local BOOKTYPE_SPELL = BOOKTYPE_SPELL or Enum.SpellBookSpellBank.Player
-local GetSpellBookItemName = GetSpellBookItemName or C_SpellBook.GetSpellBookItemName
+local SpellBookSpellBank = _G.Enum and _G.Enum.SpellBookSpellBank or {}
+local BOOKTYPE_SPELL = BOOKTYPE_SPELL or SpellBookSpellBank.Player or "player"
+local GetSpellBookItemName = GetSpellBookItemName or (C_SpellBook and C_SpellBook.GetSpellBookItemName)
 local C_Item = C_Item
+local C_Map = C_Map
+local C_Timer = C_Timer
 local UnitCanAttack = UnitCanAttack
 local UnitCanAssist = UnitCanAssist
 local UnitExists = UnitExists
@@ -82,7 +85,7 @@ local UnitGUID = UnitGUID
 local UnitIsDeadOrGhost = UnitIsDeadOrGhost
 local CheckInteractDistance = CheckInteractDistance
 local IsSpellBookItemInRange = _G.IsSpellInRange or function(index, spellBank, unit)
-  local result = C_Spell.IsSpellInRange(index, unit)
+  local result = C_Spell and C_Spell.IsSpellInRange and C_Spell.IsSpellInRange(index, unit)
   if result == true then
     return 1
   elseif result == false then
@@ -93,9 +96,9 @@ end
 local spellTypes = {"SPELL", "FUTURESPELL", "PETACTION", "FLYOUT"}
 local GetSpellBookItemInfo = _G.GetSpellBookItemInfo or function(index, spellBank)
   if type(spellBank) == "string" then
-    spellBank = (spellBank == "spell") and Enum.SpellBookSpellBank.Player or Enum.SpellBookSpellBank.Pet;
+    spellBank = (spellBank == "spell") and SpellBookSpellBank.Player or SpellBookSpellBank.Pet;
   end
-  local info = C_SpellBook.GetSpellBookItemInfo(index, spellBank)
+  local info = C_SpellBook and C_SpellBook.GetSpellBookItemInfo and C_SpellBook.GetSpellBookItemInfo(index, spellBank)
   --map spell-type
   if info and spellTypes[info.itemType or 0] then
     return spellTypes[info.itemType or 0] or "None", info.spellID, info
@@ -114,15 +117,15 @@ local GetSpellInfo = GetSpellInfo or function(spellID)
     return nil;
   end
 
-  local spellInfo = C_Spell.GetSpellInfo(spellID);
+  local spellInfo = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(spellID);
   if spellInfo then
     return spellInfo.name, nil, spellInfo.iconID, spellInfo.castTime, spellInfo.minRange, spellInfo.maxRange, spellInfo.spellID, spellInfo.originalIconID;
   end
 end
 
-local GetNumSpellTabs = GetNumSpellTabs or C_SpellBook.GetNumSpellBookSkillLines
+local GetNumSpellTabs = GetNumSpellTabs or (C_SpellBook and C_SpellBook.GetNumSpellBookSkillLines) or function() return 0 end
 local GetSpellTabInfo = GetSpellTabInfo or function(index)
-  local skillLineInfo = C_SpellBook.GetSpellBookSkillLineInfo(index);
+  local skillLineInfo = C_SpellBook and C_SpellBook.GetSpellBookSkillLineInfo and C_SpellBook.GetSpellBookSkillLineInfo(index);
   if skillLineInfo then
     return skillLineInfo.name,
         skillLineInfo.iconID,
@@ -3789,7 +3792,7 @@ local checkers_Item = setmetatable({}, {
       if not skipInCombatCheck and InCombatLockdownRestriction(unit) then
         return nil
       else
-        return C_Item.IsItemInRange(item, unit) or nil
+        return C_Item and C_Item.IsItemInRange and C_Item.IsItemInRange(item, unit) or nil
       end
     end
     t[item] = func
@@ -3929,7 +3932,7 @@ local function createCheckerList(spellList, itemList, interactList)
     for range, items in pairs(itemList) do
       for i = 1, #items do
         local item = items[i]
-        if Item:CreateFromItemID(item):IsItemDataCached() and C_Item.GetItemInfo(item) then
+        if C_Item and Item and Item.CreateFromItemID and Item:CreateFromItemID(item):IsItemDataCached() and C_Item.GetItemInfo(item) then
           addChecker(res, range, nil, checkers_Item[item], "item:" .. item)
           break
         end
@@ -4166,9 +4169,9 @@ local function createSmartChecker(friendChecker, harmChecker, miscChecker)
 end
 
 local minItemChecker = function(item)
-  if C_Item.GetItemInfo(item) then
+  if C_Item and C_Item.GetItemInfo and C_Item.GetItemInfo(item) then
     return function(unit)
-      return C_Item.IsItemInRange(item, unit)
+      return C_Item.IsItemInRange and C_Item.IsItemInRange(item, unit)
     end
   end
 end
@@ -4525,7 +4528,7 @@ function lib:processItemRequests(itemRequests)
         tremove(items, i)
       elseif pendingItemRequest[item] and GetTime() < itemRequestTimeoutAt[item] then
         return true -- still waiting for server response
-      elseif C_Item.GetItemInfo(item) then
+      elseif C_Item and C_Item.GetItemInfo and C_Item.GetItemInfo(item) then
         -- print("### processItemRequests: found: " .. tostring(item))
         foundNewItems = true
         itemRequestTimeoutAt[item] = nil
@@ -4663,7 +4666,7 @@ function lib:startMeasurement(unit, resultTable)
     for range, items in pairs(itemList) do
       for i = 1, #items do
         local item = items[i]
-        local name = C_Item.GetItemInfo(item)
+        local name = C_Item and C_Item.GetItemInfo and C_Item.GetItemInfo(item)
         if name then
           self.itemsToMeasure[name] = item
         end
@@ -4848,8 +4851,8 @@ end
 
 local GetPlayerMapPosition = GetPlayerMapPosition
   or function(unit)
-    local map = C_Map.GetBestMapForUnit(unit)
-    local pos = C_Map.GetPlayerMapPosition(map, unit)
+    local map = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit(unit)
+    local pos = map and C_Map.GetPlayerMapPosition and C_Map.GetPlayerMapPosition(map, unit)
     return pos:GetXY()
   end
 function lib:updateMeasurements()
@@ -4975,7 +4978,11 @@ function lib:activate()
   end
 
   if not self.cacheResetTimer then
-    self.cacheResetTimer = C_Timer.NewTicker(5, function()
+    if not C_Timer or not C_Timer.NewTicker then
+    self.cacheResetTimer = nil
+    return
+  end
+  self.cacheResetTimer = C_Timer and C_Timer.NewTicker and C_Timer.NewTicker(5, function()
       invalidateRangeCache(5)
     end)
   end

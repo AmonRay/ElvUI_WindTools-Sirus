@@ -7,7 +7,7 @@ local _G = _G
 local format = format
 local ipairs = pairs
 
-local C_UI_Reload = C_UI.Reload
+local C_UI_Reload = W.Compatibility.ReloadUI
 
 options.core = {
 	order = 1,

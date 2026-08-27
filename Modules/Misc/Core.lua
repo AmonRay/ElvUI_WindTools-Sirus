@@ -8,7 +8,7 @@ local tinsert = tinsert
 local type = type
 local xpcall = xpcall
 
-local C_AddOns_IsAddOnLoaded = C_AddOns.IsAddOnLoaded
+local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
 
 ---@type table<string, function[]> Table of functions to execute after addon loading
 M.addonsToLoad = {}

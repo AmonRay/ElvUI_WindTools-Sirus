@@ -22,17 +22,18 @@ local GetTime = GetTime
 local UIErrorsFrame = _G.UIErrorsFrame
 local UnitLevel = UnitLevel
 
-local C_MythicPlus_IsMythicPlusActive = C_MythicPlus.IsMythicPlusActive
-local C_QuestLog_GetInfo = C_QuestLog.GetInfo
-local C_QuestLog_GetNumQuestLogEntries = C_QuestLog.GetNumQuestLogEntries
-local C_QuestLog_GetQuestObjectives = C_QuestLog.GetQuestObjectives
-local C_QuestLog_GetQuestTagInfo = C_QuestLog.GetQuestTagInfo
-local C_QuestLog_IsComplete = C_QuestLog.IsComplete
-local C_ScenarioInfo_GetCriteriaInfo = C_ScenarioInfo.GetCriteriaInfo
-local C_ScenarioInfo_GetScenarioStepInfo = C_ScenarioInfo.GetScenarioStepInfo
+local C_MythicPlus_IsMythicPlusActive = C_MythicPlus and C_MythicPlus.IsMythicPlusActive or function() return false end
+local C_QuestLog_GetInfo = C_QuestLog and C_QuestLog.GetInfo or function() return nil end
+local C_QuestLog_GetNumQuestLogEntries = C_QuestLog and C_QuestLog.GetNumQuestLogEntries or GetNumQuestLogEntries or function() return 0 end
+local C_QuestLog_GetQuestObjectives = C_QuestLog and C_QuestLog.GetQuestObjectives or function() return {} end
+local C_QuestLog_GetQuestTagInfo = C_QuestLog and C_QuestLog.GetQuestTagInfo or function() return nil end
+local C_QuestLog_IsComplete = C_QuestLog and C_QuestLog.IsComplete or function() return false end
+local C_ScenarioInfo_GetCriteriaInfo = C_ScenarioInfo and C_ScenarioInfo.GetCriteriaInfo or function() return nil end
+local C_ScenarioInfo_GetScenarioStepInfo = C_ScenarioInfo and C_ScenarioInfo.GetScenarioStepInfo or function() return nil end
 
-local Enum_QuestFrequency_Daily = Enum.QuestFrequency.Daily
-local Enum_QuestFrequency_Weekly = Enum.QuestFrequency.Weekly
+local QuestFrequency = _G.Enum and _G.Enum.QuestFrequency or {}
+local Enum_QuestFrequency_Daily = QuestFrequency.Daily or 1
+local Enum_QuestFrequency_Weekly = QuestFrequency.Weekly or 2
 
 ---@class QuestStatusType : number
 ---@type table<string, QuestStatusType>
@@ -53,7 +54,7 @@ local ignoreTagIDs = {
 }
 
 local ignoreWorldQuestTypeIDs = {
-	[Enum.QuestTagType.Profession] = true,
+	[(_G.Enum and _G.Enum.QuestTagType and _G.Enum.QuestTagType.Profession) or -1] = true,
 }
 
 local manuallyFlaggedCompletedQuests = cache.New({

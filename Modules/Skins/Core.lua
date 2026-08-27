@@ -28,7 +28,7 @@ local GenerateClosure = GenerateClosure
 local RunNextFrame = RunNextFrame
 local Settings = Settings
 
-local C_AddOns_IsAddOnLoaded = C_AddOns.IsAddOnLoaded
+local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
 
 ---@type table<string, any> Table to store setting frames by name
 S.settingFrames = {}

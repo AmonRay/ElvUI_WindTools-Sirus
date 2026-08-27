@@ -20,8 +20,8 @@ local CreateFrame = CreateFrame
 local EventRegistry = EventRegistry
 local GetServerTime = GetServerTime
 
-local C_QuestLog_IsQuestFlaggedCompleted = C_QuestLog.IsQuestFlaggedCompleted
-local C_Timer_NewTicker = C_Timer.NewTicker
+local C_QuestLog_IsQuestFlaggedCompleted = C_QuestLog and C_QuestLog.IsQuestFlaggedCompleted or function() return false end
+local C_Timer_NewTicker = W.Compatibility.HasTimerAPI and C_Timer.NewTicker or function() return nil end
 
 local LeftButtonIcon = "|TInterface\\TUTORIALFRAME\\UI-TUTORIAL-FRAME:13:11:0:-1:512:512:12:66:230:307|t"
 
@@ -577,6 +577,9 @@ function Trackers:Acquire(event)
 				end
 				frame.tickFunc()
 			end)
+			if not frame.tickerInstance then
+				frame.tickFunc()
+			end
 		end
 
 		if functions.tooltip then

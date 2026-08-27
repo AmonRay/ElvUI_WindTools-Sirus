@@ -21,21 +21,23 @@ local UnitIsBattlePetCompanion = UnitIsBattlePetCompanion
 local UnitIsPlayer = UnitIsPlayer
 local UnitIsWildBattlePet = UnitIsWildBattlePet
 
-local C_CurrencyInfo_GetCurrencyInfo = C_CurrencyInfo.GetCurrencyInfo
-local C_EquipmentSet_GetEquipmentSetInfo = C_EquipmentSet.GetEquipmentSetInfo
-local C_Item_GetItemIconByID = C_Item.GetItemIconByID
-local C_MountJournal_GetMountInfoByID = C_MountJournal.GetMountInfoByID
-local C_Spell_GetSpellTexture = C_Spell.GetSpellTexture
-local TooltipDataProcessor_AddTooltipPostCall = TooltipDataProcessor.AddTooltipPostCall
+local Compatibility = W.Compatibility
+local C_CurrencyInfo_GetCurrencyInfo = (C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo) or function() return nil end
+local C_EquipmentSet_GetEquipmentSetInfo = (C_EquipmentSet and C_EquipmentSet.GetEquipmentSetInfo) or function() return nil end
+local C_Item_GetItemIconByID = Compatibility.GetItemIconByID
+local C_MountJournal_GetMountInfoByID = (C_MountJournal and C_MountJournal.GetMountInfoByID) or function() return nil end
+local C_Spell_GetSpellTexture = Compatibility.GetSpellTexture
+local TooltipDataProcessor_AddTooltipPostCall = _G.TooltipDataProcessor and _G.TooltipDataProcessor.AddTooltipPostCall
 
-local Enum_TooltipDataType_Achievement = Enum.TooltipDataType.Achievement
-local Enum_TooltipDataType_Currency = Enum.TooltipDataType.Currency
-local Enum_TooltipDataType_EquipmentSet = Enum.TooltipDataType.EquipmentSet
-local Enum_TooltipDataType_Item = Enum.TooltipDataType.Item
-local Enum_TooltipDataType_Macro = Enum.TooltipDataType.Macro
-local Enum_TooltipDataType_Mount = Enum.TooltipDataType.Mount
-local Enum_TooltipDataType_Spell = Enum.TooltipDataType.Spell
-local Enum_TooltipDataType_Toy = Enum.TooltipDataType.Toy
+local TooltipDataType = _G.Enum and _G.Enum.TooltipDataType or {}
+local Enum_TooltipDataType_Achievement = TooltipDataType.Achievement
+local Enum_TooltipDataType_Currency = TooltipDataType.Currency
+local Enum_TooltipDataType_EquipmentSet = TooltipDataType.EquipmentSet
+local Enum_TooltipDataType_Item = TooltipDataType.Item
+local Enum_TooltipDataType_Macro = TooltipDataType.Macro
+local Enum_TooltipDataType_Mount = TooltipDataType.Mount
+local Enum_TooltipDataType_Spell = TooltipDataType.Spell
+local Enum_TooltipDataType_Toy = TooltipDataType.Toy
 
 local tooltips = {
 	"GameTooltip",
@@ -198,6 +200,10 @@ function T:AddPetID(tt, unit, guid)
 end
 
 function T:Icons()
+	if not TooltipDataProcessor_AddTooltipPostCall then
+		return
+	end
+
 	if E.private.WT.tooltips.titleIcon.enable then
 		for _type in pairs(iconFunctions) do
 			Handle(_type)

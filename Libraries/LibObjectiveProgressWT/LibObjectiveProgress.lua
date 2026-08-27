@@ -13,8 +13,8 @@ local LOP, oldversion = LibStub:NewLibrary(MAJOR, MINOR)
 if not LOP then return end
 
 -- Localized function references
-local CQL_GetNumQuestLogEntries = _G.C_QuestLog.GetNumQuestLogEntries
-local CQL_GetInfo = _G.C_QuestLog.GetInfo
+local CQL_GetNumQuestLogEntries = (_G.C_QuestLog and _G.C_QuestLog.GetNumQuestLogEntries) or GetNumQuestLogEntries or function() return 0 end
+local CQL_GetInfo = (_G.C_QuestLog and _G.C_QuestLog.GetInfo) or function() return nil end
 
 
 function LOP:GetNPCWeightByMap(mapID, npcID, isTeeming, isAlternate)

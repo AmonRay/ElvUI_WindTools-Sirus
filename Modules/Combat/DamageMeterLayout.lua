@@ -16,8 +16,10 @@ local CreateFrame = CreateFrame
 local GetInstanceInfo = GetInstanceInfo
 local UnitAffectingCombat = UnitAffectingCombat
 
-local C_AddOns_IsAddOnLoaded = C_AddOns.IsAddOnLoaded
-local C_ChallengeMode_IsChallengeModeActive = C_ChallengeMode.IsChallengeModeActive
+local C_AddOns = _G.C_AddOns
+local C_ChallengeMode = _G.C_ChallengeMode
+local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
+local C_ChallengeMode_IsChallengeModeActive = C_ChallengeMode and C_ChallengeMode.IsChallengeModeActive or function() return false end
 
 local ELVUI_SKIN_VISUAL_LEFT_INSET, ELVUI_SKIN_VISUAL_RIGHT_INSET = 0, 0
 local OFFSCREEN_ANCHOR_X, OFFSCREEN_ANCHOR_Y = 100000, -100000

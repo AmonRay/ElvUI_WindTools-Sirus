@@ -14,9 +14,12 @@ local GetRealmID = GetRealmID
 local GetRealmName = GetRealmName
 local GetSpecializationInfoForClassID = GetSpecializationInfoForClassID
 
-local C_ChallengeMode_GetMapUIInfo = C_ChallengeMode.GetMapUIInfo
-local C_CVar_GetCVarBool = C_CVar.GetCVarBool
-local C_LootJournal_GetItemSetItems = C_LootJournal.GetItemSetItems
+local C_ChallengeMode = _G.C_ChallengeMode
+local C_CVar = _G.C_CVar
+local C_LootJournal = _G.C_LootJournal
+local C_ChallengeMode_GetMapUIInfo = C_ChallengeMode and C_ChallengeMode.GetMapUIInfo or function() return nil end
+local C_CVar_GetCVarBool = (C_CVar and C_CVar.GetCVarBool) or function(name) return GetCVar(name) == "1" end
+local C_LootJournal_GetItemSetItems = C_LootJournal and C_LootJournal.GetItemSetItems
 
 E.myClassColor = E.myClassColor or E:ClassColor(E.myclass, true)
 
@@ -28,7 +31,7 @@ W.PlainTitle = gsub(W.Title, "|c........([^|]+)|r", "%1")
 W.Locale = GetLocale()
 W.ChineseLocale = strsub(W.Locale, 0, 2) == "zh"
 W.AsianLocale = W.ChineseLocale or W.Locale == "koKR"
-W.SupportElvUIVersion = 15.21
+W.SupportElvUIVersion = 0
 W.UseKeyDown = C_CVar_GetCVarBool("ActionButtonUseKeyDown")
 
 -- Game
@@ -244,9 +247,14 @@ W.CurrentTierSetTable = {
 ---@type table<number, true>
 W.CurrentTierSetItemIDTable = {}
 
-for id in pairs(W.CurrentTierSetTable) do
-	for _, itemInfo in pairs(C_LootJournal_GetItemSetItems(id)) do
-		W.CurrentTierSetItemIDTable[itemInfo.itemID] = true
+if C_LootJournal_GetItemSetItems then
+	for id in pairs(W.CurrentTierSetTable) do
+		local items = C_LootJournal_GetItemSetItems(id)
+		if items then
+			for _, itemInfo in pairs(items) do
+				W.CurrentTierSetItemIDTable[itemInfo.itemID] = true
+			end
+		end
 	end
 end
 

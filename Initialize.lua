@@ -14,7 +14,9 @@ local strfind = strfind
 local strmatch = strmatch
 local tContains = tContains
 
-local C_AddOns_GetAddOnMetadata = C_AddOns.GetAddOnMetadata
+-- The retail namespace is absent on stock 3.3.5, while the modified client may provide it.
+local C_AddOns = _G.C_AddOns
+local C_AddOns_GetAddOnMetadata = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 
 ---@class WindTools : AceAddon, AceConsole-3.0, AceEvent-3.0, AceTimer-3.0, AceHook-3.0
 local W = AceAddon:NewAddon(addonName, "AceConsole-3.0", "AceEvent-3.0", "AceTimer-3.0", "AceHook-3.0")
@@ -33,8 +35,8 @@ addon[7] = G.WT
 
 _G["WindTools"] = addon
 
-local versionString = C_AddOns_GetAddOnMetadata(addonName, "Version")
-local xVersionString = C_AddOns_GetAddOnMetadata(addonName, "X-Version")
+local versionString = C_AddOns_GetAddOnMetadata(addonName, "Version") or ""
+local xVersionString = C_AddOns_GetAddOnMetadata(addonName, "X-Version") or "0.0"
 
 local function getVersion()
 	local version, variant, subversion
@@ -90,10 +92,29 @@ W:NewModule("QuestProgress", "AceEvent-3.0")
 -- Utilities namespace
 W.Utilities = {}
 
+-- Modules that require modern structured APIs. They remain unloaded on stock Wrath
+-- instead of aborting the whole addon during file evaluation.
+W.ModuleRequirements = {
+	PreyHunt = { "HasModernQuestAPI", "HasModernMapAPI" },
+	SuperTracker = { "HasModernMapAPI" },
+	DamageMeterLayout = { "HasChallengeModeAPI" },
+	MythicPlus = { "HasChallengeModeAPI", "HasMythicPlusAPI" },
+	ObjectiveProgress = { "HasModernQuestAPI" },
+	Icons = { "HasTooltipDataProcessor" },
+	ReshiiWrapsUpgrade = { "HasTooltipDataProcessor" },
+	HideCrafter = { "HasTooltipDataProcessor" },
+	SkipCutScene = { "HasModernCinematicAPI" },
+	SpellActivationAlert = { "HasSpellActivationOverlay" },
+	Progression = { "HasModernCollectionsAPI" },
+}
+
 -- Pre-register libs into ElvUI
 E:AddLib("Deflate", "LibDeflate")
 E.Libs.Deflate.compressLevel = { level = 5 }
-E:AddLib("OpenRaid", "LibOpenRaid-1.0")
+-- LibOpenRaid is retail-only until its Wrath data model is verified in the modified client.
+if not (W.Compatibility.HasLegacyQuestAPI and not W.Compatibility.HasModernSpellAPI and not W.Compatibility.HasModernMapAPI) then
+	E:AddLib("OpenRaid", "LibOpenRaid-1.0")
+end
 E:AddLib("ObjectiveProgressWT", "LibObjectiveProgress-WT")
 E:AddLib("RangeCheck", "LibRangeCheck-3.0")
 E:AddLib("Keystone", "LibKeystone")

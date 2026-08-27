@@ -5,10 +5,12 @@ local IsInGroup = IsInGroup
 local RunNextFrame = RunNextFrame
 local UnitName = UnitName
 
-local C_RestrictedActions_IsAddOnRestrictionActive = C_RestrictedActions.IsAddOnRestrictionActive
+local C_RestrictedActions = _G.C_RestrictedActions
+local C_RestrictedActions_IsAddOnRestrictionActive = C_RestrictedActions and C_RestrictedActions.IsAddOnRestrictionActive or function() return false end
 
 local LE_PARTY_CATEGORY_INSTANCE = LE_PARTY_CATEGORY_INSTANCE
-local Enum_AddOnRestrictionType_ChallengeMode = Enum.AddOnRestrictionType.ChallengeMode
+local Enum_AddOnRestrictionType = _G.Enum and _G.Enum.AddOnRestrictionType
+local Enum_AddOnRestrictionType_ChallengeMode = Enum_AddOnRestrictionType and Enum_AddOnRestrictionType.ChallengeMode
 
 A.EventList = {
 	"CHALLENGE_MODE_COMPLETED",

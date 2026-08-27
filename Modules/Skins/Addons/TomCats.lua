@@ -7,7 +7,7 @@ local _G = _G
 local pairs = pairs
 local unpack = unpack
 
-local C_Item_GetItemQualityColor = C_Item.GetItemQualityColor
+local C_Item_GetItemQualityColor = W.Compatibility.GetItemQualityColor
 
 local atlasToQuality = {
 	["auctionhouse-itemicon-border-gray"] = 0,

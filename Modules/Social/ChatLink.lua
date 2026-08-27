@@ -15,14 +15,14 @@ local GetAchievementInfo = GetAchievementInfo
 local GetPvpTalentInfoByID = GetPvpTalentInfoByID
 local GetTalentInfoByID = GetTalentInfoByID
 
-local C_ChallengeMode_GetMapUIInfo = C_ChallengeMode.GetMapUIInfo
-local C_CurrencyInfo_GetCurrencyInfo = C_CurrencyInfo.GetCurrencyInfo
-local C_Item_GetDetailedItemLevelInfo = C_Item.GetDetailedItemLevelInfo
-local C_Item_GetItemIconByID = C_Item.GetItemIconByID
-local C_Item_GetItemInfoInstant = C_Item.GetItemInfoInstant
-local C_Item_GetItemNameByID = C_Item.GetItemNameByID
-local C_Soulbinds_GetConduitCollectionData = C_Soulbinds.GetConduitCollectionData
-local C_Spell_GetSpellTexture = C_Spell.GetSpellTexture
+local C_ChallengeMode_GetMapUIInfo = C_ChallengeMode and C_ChallengeMode.GetMapUIInfo or function() return nil end
+local C_CurrencyInfo_GetCurrencyInfo = C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo or function() return nil end
+local C_Item_GetDetailedItemLevelInfo = W.Compatibility.GetDetailedItemLevelInfo
+local C_Item_GetItemIconByID = W.Compatibility.GetItemIconByID
+local C_Item_GetItemInfoInstant = W.Compatibility.GetItemInfoInstant
+local C_Item_GetItemNameByID = C_Item and C_Item.GetItemNameByID or function(itemID) return select(1, GetItemInfo(itemID)) end
+local C_Soulbinds_GetConduitCollectionData = C_Soulbinds and C_Soulbinds.GetConduitCollectionData or function() return nil end
+local C_Spell_GetSpellTexture = W.Compatibility.GetSpellTexture
 
 local RETRIEVING_ITEM_INFO = RETRIEVING_ITEM_INFO
 local ITEM_LEVEL = ITEM_LEVEL

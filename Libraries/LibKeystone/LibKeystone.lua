@@ -1,5 +1,5 @@
 --@curseforge-project-slug: libkeystone@
-if WOW_PROJECT_ID ~= 1 then return end -- Retail
+if WOW_PROJECT_ID and WOW_PROJECT_ID ~= 1 and WOW_PROJECT_ID ~= 11 then return end -- Retail/Wrath-compatible clients
 
 local LKS = LibStub:NewLibrary("LibKeystone", 11)
 if not LKS then return end -- No upgrade needed
@@ -12,7 +12,9 @@ local callbackMap = LKS.callbackMap
 local type, error = type, error
 
 do
-	local result = C_ChatInfo.RegisterAddonMessagePrefix("LibKS")
+	local registerPrefix = C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix or RegisterAddonMessagePrefix
+	if not registerPrefix then return end
+	local result = registerPrefix("LibKS")
 	-- 0=success, 1=duplicate, 2=invalid, 3=toomany
 	if type(result) == "number" and result > 1 then
 		error("LibKeystone: Failed to register the addon prefix.")
@@ -49,12 +51,12 @@ end
 local GetInfo
 do
 	-- Normal APIs
-	local GetOwnedKeystoneLevel, GetOwnedKeystoneChallengeMapID = C_MythicPlus.GetOwnedKeystoneLevel, C_MythicPlus.GetOwnedKeystoneChallengeMapID
-	local GetPlayerMythicPlusRatingSummary = C_PlayerInfo.GetPlayerMythicPlusRatingSummary
+	local GetOwnedKeystoneLevel, GetOwnedKeystoneChallengeMapID = C_MythicPlus and C_MythicPlus.GetOwnedKeystoneLevel, C_MythicPlus and C_MythicPlus.GetOwnedKeystoneChallengeMapID
+	local GetPlayerMythicPlusRatingSummary = C_PlayerInfo and C_PlayerInfo.GetPlayerMythicPlusRatingSummary
 
 	-- Timerunning APIs
-	local GetContainerNumSlots, GetContainerItemID, GetContainerItemLink = C_Container.GetContainerNumSlots, C_Container.GetContainerItemID, C_Container.GetContainerItemLink
-	local IsItemKeystoneByID, PlayerIsTimerunning = C_Item.IsItemKeystoneByID, PlayerIsTimerunning
+	local GetContainerNumSlots, GetContainerItemID, GetContainerItemLink = C_Container and C_Container.GetContainerNumSlots, C_Container and C_Container.GetContainerItemID, C_Container and C_Container.GetContainerItemLink
+	local IsItemKeystoneByID, PlayerIsTimerunning = C_Item and C_Item.IsItemKeystoneByID, PlayerIsTimerunning
 	local strsplit = string.split
 	function GetInfo()
 		-- Keystone level
@@ -101,7 +103,8 @@ do
 	end
 end
 
-local SendAddonMessage, CTimerNewTimer = C_ChatInfo.SendAddonMessage, C_Timer.NewTimer
+local SendAddonMessage = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
+local CTimerNewTimer = (C_Timer and C_Timer.NewTimer) or function() return nil end
 local GetTime = GetTime
 local next, securecallfunction = next, securecallfunction
 local throttleTime = 3 -- Seconds

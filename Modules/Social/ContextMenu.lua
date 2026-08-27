@@ -33,15 +33,15 @@ local UnitClass = UnitClass
 local UnitHealthMax = UnitHealthMax
 local UnitPlayerControlled = UnitPlayerControlled
 
-local C_BattleNet_GetFriendAccountInfo = C_BattleNet.GetFriendAccountInfo
-local C_BattleNet_GetFriendGameAccountInfo = C_BattleNet.GetFriendGameAccountInfo
-local C_BattleNet_GetFriendNumGameAccounts = C_BattleNet.GetFriendNumGameAccounts
-local C_ChatInfo_SendChatMessage = C_ChatInfo.SendChatMessage
-local C_Club_GetGuildClubId = C_Club.GetGuildClubId
-local C_FriendList_SendWho = C_FriendList.SendWho
-local C_GuildInfo_Invite = C_GuildInfo.Invite
-local C_SpecializationInfo_GetSpecialization = C_SpecializationInfo.GetSpecialization
-local C_SpecializationInfo_GetSpecializationInfo = C_SpecializationInfo.GetSpecializationInfo
+local C_BattleNet_GetFriendAccountInfo = C_BattleNet and C_BattleNet.GetFriendAccountInfo or function() return nil end
+local C_BattleNet_GetFriendGameAccountInfo = C_BattleNet and C_BattleNet.GetFriendGameAccountInfo or function() return nil end
+local C_BattleNet_GetFriendNumGameAccounts = C_BattleNet and C_BattleNet.GetFriendNumGameAccounts or function() return 0 end
+local C_ChatInfo_SendChatMessage = W.Compatibility.SendChatMessage or function() end
+local C_Club_GetGuildClubId = C_Club and C_Club.GetGuildClubId or function() return nil end
+local C_FriendList_SendWho = C_FriendList and C_FriendList.SendWho or SendWho or function() end
+local C_GuildInfo_Invite = C_GuildInfo and C_GuildInfo.Invite or GuildInvite or function() end
+local C_SpecializationInfo_GetSpecialization = C_SpecializationInfo and C_SpecializationInfo.GetSpecialization or GetSpecialization or function() return nil end
+local C_SpecializationInfo_GetSpecializationInfo = C_SpecializationInfo and C_SpecializationInfo.GetSpecializationInfo or GetSpecializationInfo or function() return nil end
 local Menu_ModifyMenu = Menu.ModifyMenu
 
 local CR_VERSATILITY_DAMAGE_DONE = CR_VERSATILITY_DAMAGE_DONE

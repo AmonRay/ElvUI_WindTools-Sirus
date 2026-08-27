@@ -7,7 +7,7 @@ local gsub = gsub
 local hooksecurefunc = hooksecurefunc
 local strmatch = strmatch
 
-local C_Item_GetDetailedItemLevelInfo = C_Item.GetDetailedItemLevelInfo
+local C_Item_GetDetailedItemLevelInfo = W.Compatibility.GetDetailedItemLevelInfo or function(itemLink) return GetItemInfo(itemLink) end
 
 local cache = {}
 

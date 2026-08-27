@@ -14,7 +14,7 @@ local GetScreenWidth = GetScreenWidth
 local InCombatLockdown = InCombatLockdown
 local RunNextFrame = RunNextFrame
 
-local C_AddOns_IsAddOnLoaded = C_AddOns.IsAddOnLoaded
+local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
 
 local BlizzardFrames = {
 	"AddonList",

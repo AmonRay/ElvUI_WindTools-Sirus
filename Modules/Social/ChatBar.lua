@@ -14,8 +14,8 @@ local strmatch = strmatch
 local tinsert = tinsert
 local tostring = tostring
 
-local C_Club_GetClubInfo = C_Club.GetClubInfo
-local C_GuildInfo_IsGuildOfficer = C_GuildInfo.IsGuildOfficer
+local C_Club_GetClubInfo = C_Club and C_Club.GetClubInfo or function() return nil end
+local C_GuildInfo_IsGuildOfficer = C_GuildInfo and C_GuildInfo.IsGuildOfficer or function() return false end
 local ChatFrameUtil_OpenChat = ChatFrameUtil.OpenChat
 local CreateFrame = CreateFrame
 local DefaultChatFrame = _G.DEFAULT_CHAT_FRAME

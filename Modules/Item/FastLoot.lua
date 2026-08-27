@@ -7,8 +7,8 @@ local IsModifiedClick = IsModifiedClick
 local IsFishingLoot = IsFishingLoot
 local LootSlot = LootSlot
 
-local C_Container_GetContainerNumFreeSlots = C_Container.GetContainerNumFreeSlots
-local C_CVar_GetCVarBool = C_CVar.GetCVarBool
+local C_Container_GetContainerNumFreeSlots = W.Compatibility.GetContainerNumFreeSlots
+local C_CVar_GetCVarBool = W.Compatibility.GetCVarBool
 
 local NUM_BAG_SLOTS = NUM_BAG_SLOTS
 

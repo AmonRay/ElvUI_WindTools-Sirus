@@ -3,7 +3,7 @@ local M = W.Modules.Misc ---@class Misc
 
 local CreateFrame = CreateFrame
 
-local C_PartyInfo_LeaveParty = C_PartyInfo.LeaveParty
+local C_PartyInfo_LeaveParty = C_PartyInfo and C_PartyInfo.LeaveParty or LeaveParty or function() end
 
 local function createInvisibleButton(name, buttonType, content)
 	local button = CreateFrame("Button", name, E.UIParent, "SecureActionButtonTemplate")

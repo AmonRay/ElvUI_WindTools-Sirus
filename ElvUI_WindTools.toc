@@ -1,4 +1,5 @@
-## Interface: 120100
+## Interface: 30300
+## X-WindTools-Target: WoW 3.3.5a modified client
 ## Author: fang2hou
 ## Version: @project-version@
 ## X-Version: 4.20
@@ -21,6 +22,7 @@
 ## X-WoWI-ID: 25687
 ## X-Wago-ID: lQNlD9Ne
 
+Preflight.lua
 Libraries\Load_Libraries.xml
 Initialize.lua
 Locales\Load_Locales.xml

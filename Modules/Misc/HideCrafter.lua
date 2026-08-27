@@ -5,8 +5,8 @@ local _G = _G
 local strmatch = strmatch
 local tContains = tContains
 
-local TooltipDataProcessor_AddTooltipPostCall = TooltipDataProcessor.AddTooltipPostCall
-local Enum_TooltipDataType_Item = Enum.TooltipDataType.Item
+local TooltipDataProcessor_AddTooltipPostCall = _G.TooltipDataProcessor and _G.TooltipDataProcessor.AddTooltipPostCall
+local Enum_TooltipDataType_Item = _G.Enum and _G.Enum.TooltipDataType and _G.Enum.TooltipDataType.Item
 
 local tooltips = {
 	"GameTooltip",
@@ -40,7 +40,9 @@ local function removeCraftInformation(tooltip, data)
 end
 
 function M:HideCrafter()
-	TooltipDataProcessor_AddTooltipPostCall(Enum_TooltipDataType_Item, removeCraftInformation)
+	if TooltipDataProcessor_AddTooltipPostCall and Enum_TooltipDataType_Item then
+		TooltipDataProcessor_AddTooltipPostCall(Enum_TooltipDataType_Item, removeCraftInformation)
+	end
 end
 
 M:AddCallback("HideCrafter")

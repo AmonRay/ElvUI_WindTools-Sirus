@@ -10,7 +10,8 @@ local wipe = wipe
 
 local Mixin = Mixin
 
-local C_Timer_NewTicker = C_Timer.NewTicker
+local C_Timer = _G.C_Timer
+local C_Timer_NewTicker = W.Compatibility.HasTimerAPI and C_Timer.NewTicker
 
 ---@class CacheConfig Configuration for cache instance
 ---@field defaultTTL number Default time-to-live in seconds (0 = no expiration)
@@ -137,10 +138,11 @@ local function startAutoCleanup(self)
 		self.cleanupTimer:Cancel()
 	end
 
-	self.cleanupTimer = C_Timer_NewTicker(self.config.cleanupInterval, function()
-		cleanup(self)
-	end)
-end
+	if C_Timer_NewTicker then
+		self.cleanupTimer = C_Timer_NewTicker(self.config.cleanupInterval, function()
+			cleanup(self)
+		end)
+	end
 
 ---Stop automatic cleanup timer
 ---@param self Cache

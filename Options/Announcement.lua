@@ -13,7 +13,7 @@ local pairs = pairs
 local strjoin = strjoin
 local strmatch = strmatch
 
-local C_Spell_GetSpellLink = C_Spell.GetSpellLink
+local C_Spell_GetSpellLink = W.Compatibility.GetSpellLink
 
 local function ImportantColorString(s)
 	return C.StringByTemplate(s, "blue-400")

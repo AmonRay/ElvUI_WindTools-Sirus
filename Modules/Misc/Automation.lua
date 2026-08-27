@@ -11,7 +11,7 @@ local StaticPopup_Hide = StaticPopup_Hide
 local UnitAffectingCombat = UnitAffectingCombat
 local UnitExists = UnitExists
 
-local C_SummonInfo_ConfirmSummon = C_SummonInfo.ConfirmSummon
+local C_SummonInfo_ConfirmSummon = C_SummonInfo and C_SummonInfo.ConfirmSummon or function() end
 
 local confirmSummonAfterCombat = false
 

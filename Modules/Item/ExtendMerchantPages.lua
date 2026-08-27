@@ -10,7 +10,7 @@ local pairs = pairs
 local CreateFrame = CreateFrame
 local GetNumBuybackItems = GetNumBuybackItems
 
-local C_AddOns_IsAddOnLoaded = C_AddOns.IsAddOnLoaded
+local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
 
 local BLIZZARD_MERCHANT_ITEMS_PER_PAGE = 10
 local BLIZZARD_BUYBACK_ITEMS_PER_PAGE = 12

@@ -32,8 +32,8 @@ local InCombatLockdown = InCombatLockdown
 local RegisterStateDriver = RegisterStateDriver
 local UnregisterStateDriver = UnregisterStateDriver
 
-local C_AddOns_IsAddOnLoaded = C_AddOns.IsAddOnLoaded
-local C_Spell_GetSpellTexture = C_Spell.GetSpellTexture
+local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
+local C_Spell_GetSpellTexture = W.Compatibility.GetSpellTexture
 
 local BuildinIgnoreSettings = {
 	full = {

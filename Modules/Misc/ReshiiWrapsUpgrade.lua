@@ -9,8 +9,8 @@ local GetInventoryItemID = GetInventoryItemID
 local InCombatLockdown = InCombatLockdown
 local ShowUIPanel = ShowUIPanel
 
-local Enum_TooltipDataType_Item = Enum.TooltipDataType.Item
-local TooltipDataProcessor_AddTooltipPostCall = TooltipDataProcessor.AddTooltipPostCall
+local Enum_TooltipDataType_Item = _G.Enum and _G.Enum.TooltipDataType and _G.Enum.TooltipDataType.Item
+local TooltipDataProcessor_AddTooltipPostCall = _G.TooltipDataProcessor and _G.TooltipDataProcessor.AddTooltipPostCall
 
 local ScrollButtonIcon = "|TInterface\\TUTORIALFRAME\\UI-TUTORIAL-FRAME:13:11:0:-1:512:512:12:66:127:204|t"
 
@@ -41,7 +41,8 @@ function M:ReshiiWrapsUpgrade()
 	end)
 end
 
-TooltipDataProcessor_AddTooltipPostCall(Enum_TooltipDataType_Item, function(tooltip, data)
+if TooltipDataProcessor_AddTooltipPostCall and Enum_TooltipDataType_Item then
+	TooltipDataProcessor_AddTooltipPostCall(Enum_TooltipDataType_Item, function(tooltip, data)
 	if tooltip:GetOwner() ~= _G.CharacterBackSlot or data.id ~= WARPS_ITEM_ID then
 		return
 	end
@@ -56,5 +57,6 @@ TooltipDataProcessor_AddTooltipPostCall(Enum_TooltipDataType_Item, function(tool
 		F.GetWindStyleText(L["Open Upgrade Menu"])
 	)
 end)
+end
 
 M:AddCallback("ReshiiWrapsUpgrade")

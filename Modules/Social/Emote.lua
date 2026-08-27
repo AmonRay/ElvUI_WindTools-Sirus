@@ -15,7 +15,7 @@ local ChatFrameUtil_AddMessageEventFilter = ChatFrameUtil.AddMessageEventFilter
 local ChatFrameUtil_ChooseBoxForSend = ChatFrameUtil.ChooseBoxForSend
 local CreateFrame = CreateFrame
 
-local C_ChatBubbles_GetAllChatBubbles = C_ChatBubbles.GetAllChatBubbles
+local C_ChatBubbles_GetAllChatBubbles = C_ChatBubbles and C_ChatBubbles.GetAllChatBubbles or function() return {} end
 
 local emotes = {
 	{ key = "angel", zhTW = "天使", zhCN = "天使" },

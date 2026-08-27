@@ -12,14 +12,16 @@ local pcall = pcall
 local strmatch = strmatch
 local strsub = strsub
 local tinsert = tinsert
+local ipairs = ipairs
 local tonumber = tonumber
 local unpack = unpack
 local xpcall = xpcall
 
 local InCombatLockdown = InCombatLockdown
 
-local C_PartyInfo_InviteUnit = C_PartyInfo.InviteUnit
-local C_UI_Reload = C_UI.Reload
+local Compatibility = W.Compatibility
+local C_PartyInfo_InviteUnit = Compatibility.InviteUnit
+local C_UI_Reload = Compatibility.ReloadUI
 
 local ACCEPT, CANCEL = ACCEPT, CANCEL
 
@@ -155,6 +157,11 @@ function W:RegisterModule(name)
 		F.Developer.ThrowError("The name of module is required!")
 		return
 	end
+	local requirements = self.ModuleRequirements and self.ModuleRequirements[name]
+	if requirements and not self:HasCapabilities(requirements) then
+		return
+	end
+
 	if self.initialized then
 		self:GetModule(name):Initialize()
 	else
@@ -162,12 +169,25 @@ function W:RegisterModule(name)
 	end
 end
 
+function W:HasCapabilities(requirements)
+	for _, capability in ipairs(requirements) do
+		if not self.Compatibility[capability] then
+			return false
+		end
+	end
+	return true
+end
+
 -- WindTools module initialization
 function W:InitializeModules()
 	for _, moduleName in pairs(W.RegisteredModules) do
 		local module = self:GetModule(moduleName)
-		if module.Initialize then
-			xpcall(module.Initialize, F.Developer.LogDebug, module)
+		if not module then
+			F.Developer.LogWarning("Skipping unavailable module: " .. tostring(moduleName))
+		else
+			if module.Initialize then
+				xpcall(module.Initialize, F.Developer.LogDebug, module)
+			end
 		end
 	end
 end
@@ -182,7 +202,7 @@ function W:UpdateModules()
 	self:UpdateScripts()
 	for _, moduleName in pairs(self.RegisteredModules) do
 		local module = W:GetModule(moduleName)
-		if module.ProfileUpdate then
+		if module and module.ProfileUpdate then
 			pcall(module.ProfileUpdate, module)
 		end
 	end

@@ -22,9 +22,11 @@ local UnitPower = UnitPower
 local UnitPowerPercent = UnitPowerPercent
 local UnitPowerType = UnitPowerType
 
-local C_StringUtil_TruncateWhenZero = C_StringUtil.TruncateWhenZero
-local CurveConstants_ScaleTo100 = CurveConstants.ScaleTo100
-local Enum_PowerType_Mana = Enum.PowerType.Mana
+local C_StringUtil_TruncateWhenZero = C_StringUtil and C_StringUtil.TruncateWhenZero or function(value)
+	return value and value > 0 and value or ""
+end
+local CurveConstants_ScaleTo100 = CurveConstants and CurveConstants.ScaleTo100
+local Enum_PowerType_Mana = _G.Enum and _G.Enum.PowerType and _G.Enum.PowerType.Mana or 0
 
 local function GetClassColorString(class)
 	local hexString = select(4, GetClassColor(class))
@@ -156,15 +158,15 @@ function Tags:Initialize()
 
 	-- Health Percentage
 	E:AddTag("perhp1f", "UNIT_HEALTH UNIT_MAXHEALTH", function(unit)
-		return format("%.1f", UnitHealthPercent(unit, true, CurveConstants_ScaleTo100) --[[@as number]])
+		return format("%.1f", (UnitHealthPercent and UnitHealthPercent(unit, true, CurveConstants_ScaleTo100) or 0) --[[@as number]])
 	end)
 
 	E:AddTag("perhp2f", "UNIT_HEALTH UNIT_MAXHEALTH", function(unit)
-		return format("%.2f", UnitHealthPercent(unit, true, CurveConstants_ScaleTo100) --[[@as number]])
+		return format("%.2f", (UnitHealthPercent and UnitHealthPercent(unit, true, CurveConstants_ScaleTo100) or 0) --[[@as number]])
 	end)
 
 	E:AddTag("perhp3f", "UNIT_HEALTH UNIT_MAXHEALTH", function(unit)
-		return format("%.3f", UnitHealthPercent(unit, true, CurveConstants_ScaleTo100) --[[@as number]])
+		return format("%.3f", (UnitHealthPercent and UnitHealthPercent(unit, true, CurveConstants_ScaleTo100) or 0) --[[@as number]])
 	end)
 
 	-- Absorbs autohide

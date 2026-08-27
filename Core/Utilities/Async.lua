@@ -10,7 +10,7 @@ local GetAchievementInfo = GetAchievementInfo
 local Item = Item
 local Spell = Spell
 
-local C_Item_GetItemInfoInstant = C_Item.GetItemInfoInstant
+local C_Item_GetItemInfoInstant = W.Compatibility.GetItemInfoInstant
 
 ---@cast F Functions
 

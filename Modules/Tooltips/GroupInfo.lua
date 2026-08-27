@@ -11,7 +11,7 @@ local gsub = gsub
 local ipairs = ipairs
 local strfind = strfind
 
-local C_AddOns_IsAddOnLoaded = C_AddOns.IsAddOnLoaded
+local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
 
 local ROLE_ICON_PATTERN = "^|A:groupfinder%-icon%-role%-micro"
 

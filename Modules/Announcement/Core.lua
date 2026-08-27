@@ -16,16 +16,20 @@ local IsPartyLFG = IsPartyLFG
 local UnitIsGroupAssistant = UnitIsGroupAssistant
 local UnitIsGroupLeader = UnitIsGroupLeader
 
-local C_RestrictedActions_IsAddOnRestrictionActive = C_RestrictedActions.IsAddOnRestrictionActive
+local C_RestrictedActions = _G.C_RestrictedActions
+local C_RestrictedActions_IsAddOnRestrictionActive = C_RestrictedActions and C_RestrictedActions.IsAddOnRestrictionActive
 
-local Enum_AddOnRestrictionType_ChallengeMode = Enum.AddOnRestrictionType.ChallengeMode
+local Enum_AddOnRestrictionType = _G.Enum and _G.Enum.AddOnRestrictionType
+local Enum_AddOnRestrictionType_ChallengeMode = Enum_AddOnRestrictionType and Enum_AddOnRestrictionType.ChallengeMode
 local LE_PARTY_CATEGORY_HOME = LE_PARTY_CATEGORY_HOME
 local LE_PARTY_CATEGORY_INSTANCE = LE_PARTY_CATEGORY_INSTANCE
 
 A.history = {}
 
 function A:CanSentMessage()
-	return not C_RestrictedActions_IsAddOnRestrictionActive(Enum_AddOnRestrictionType_ChallengeMode)
+	return not C_RestrictedActions_IsAddOnRestrictionActive
+		or not Enum_AddOnRestrictionType_ChallengeMode
+		or not C_RestrictedActions_IsAddOnRestrictionActive(Enum_AddOnRestrictionType_ChallengeMode)
 end
 
 function A:AddHistory(text, channel)
