@@ -408,7 +408,9 @@ function S:SkinAlertRewardIcons(frame)
 					end
 				end
 
-				reward.texture:SetMask("")
+				if reward.texture.SetMask then
+					reward.texture:SetMask("")
+				end
 				reward.texture:SetTexCoords()
 				reward.texture:ClearAllPoints()
 				reward.texture:SetInside(reward, 7, 7)
@@ -425,53 +427,68 @@ function S:AlertFrames()
 		return
 	end
 
-	-- Achievements
-	self:SecureHook(_G.AchievementAlertSystem, "setUpFunction", "SkinAchievementAlert")
-	self:SecureHook(_G.CriteriaAlertSystem, "setUpFunction", "SkinCriteriaAlert")
-	self:SecureHook(_G.MonthlyActivityAlertSystem, "setUpFunction", "SkinCriteriaAlert")
+	-- Achievements (MonthlyActivityAlertSystem is retail-only and absent on 3.3.5a)
+	if _G.AchievementAlertSystem then
+		self:SecureHook(_G.AchievementAlertSystem, "setUpFunction", "SkinAchievementAlert")
+	end
+	if _G.CriteriaAlertSystem then
+		self:SecureHook(_G.CriteriaAlertSystem, "setUpFunction", "SkinCriteriaAlert")
+	end
+	if _G.MonthlyActivityAlertSystem then
+		self:SecureHook(_G.MonthlyActivityAlertSystem, "setUpFunction", "SkinCriteriaAlert")
+	end
+
+	-- Nearly all of these alert systems are retail-only (dungeon/garrison/world
+	-- quest/new-item/cosmetics) and are simply absent on 3.3.5a, so wrap every
+	-- hook in a nil-safe check and only wire the ones that actually exist.
+	local function secureHook(frame, method, handler)
+		if frame then
+			self:SecureHook(frame, method, handler)
+		end
+	end
 
 	-- Encounters
-	self:SecureHook(_G.DungeonCompletionAlertSystem, "setUpFunction", "SkinAlert")
-	self:SecureHook(_G.GuildChallengeAlertSystem, "setUpFunction", "SkinGuildChallengeAlert")
-	self:SecureHook(_G.InvasionAlertSystem, "setUpFunction", "SkinInvasionAlert")
-	self:SecureHook(_G.ScenarioAlertSystem, "setUpFunction", "SkinAlert")
-	self:SecureHook(_G.WorldQuestCompleteAlertSystem, "setUpFunction", "SkinWorldQuestCompleteAlert")
+	secureHook(_G.DungeonCompletionAlertSystem, "setUpFunction", "SkinAlert")
+	secureHook(_G.GuildChallengeAlertSystem, "setUpFunction", "SkinGuildChallengeAlert")
+	secureHook(_G.InvasionAlertSystem, "setUpFunction", "SkinInvasionAlert")
+	secureHook(_G.ScenarioAlertSystem, "setUpFunction", "SkinAlert")
+	secureHook(_G.WorldQuestCompleteAlertSystem, "setUpFunction", "SkinWorldQuestCompleteAlert")
 
 	-- Garrisons
-	self:SecureHook(_G.GarrisonFollowerAlertSystem, "setUpFunction", "SkinAlert")
-	self:SecureHook(_G.GarrisonShipFollowerAlertSystem, "setUpFunction", "SkinAlert")
-	self:SecureHook(_G.GarrisonTalentAlertSystem, "setUpFunction", "SkinGarrisonTalentAlert")
-	self:SecureHook(_G.GarrisonBuildingAlertSystem, "setUpFunction", "SkinGarrisonBuildingAlert")
-	self:SecureHook(_G.GarrisonMissionAlertSystem, "setUpFunction", "SkinAlert")
-	self:SecureHook(_G.GarrisonShipMissionAlertSystem, "setUpFunction", "SkinAlert")
-	self:SecureHook(_G.GarrisonRandomMissionAlertSystem, "setUpFunction", "SkinAlert")
+	secureHook(_G.GarrisonFollowerAlertSystem, "setUpFunction", "SkinAlert")
+	secureHook(_G.GarrisonShipFollowerAlertSystem, "setUpFunction", "SkinAlert")
+	secureHook(_G.GarrisonTalentAlertSystem, "setUpFunction", "SkinGarrisonTalentAlert")
+	secureHook(_G.GarrisonBuildingAlertSystem, "setUpFunction", "SkinGarrisonBuildingAlert")
+	secureHook(_G.GarrisonMissionAlertSystem, "setUpFunction", "SkinAlert")
+	secureHook(_G.GarrisonShipMissionAlertSystem, "setUpFunction", "SkinAlert")
+	secureHook(_G.GarrisonRandomMissionAlertSystem, "setUpFunction", "SkinAlert")
 
 	-- Loot
-	self:SecureHook(_G.LegendaryItemAlertSystem, "setUpFunction", "SkinLegendaryItemAlert")
-	self:SecureHook(_G.LootAlertSystem, "setUpFunction", "SkinLootAlert")
-	self:SecureHook(_G.LootUpgradeAlertSystem, "setUpFunction", "SkinLootUpgradeAlert")
-	self:SecureHook(_G.MoneyWonAlertSystem, "setUpFunction", "SkinMoneyWonAlert")
-	self:SecureHook(_G.HonorAwardedAlertSystem, "setUpFunction", "SkinMoneyWonAlert")
-	self:SecureHook(_G.EntitlementDeliveredAlertSystem, "setUpFunction", "SkinAlert")
-	self:SecureHook(_G.RafRewardDeliveredAlertSystem, "setUpFunction", "SkinRafRewardDeliveredAlert")
-	self:SecureHook(_G.HousingItemEarnedAlertFrameSystem, "setUpFunction", "SkinHousingItemEarnedAlert")
-	self:SecureHook(_G.InitiativeTaskCompleteAlertFrameSystem, "setUpFunction", "SkinHousingItemEarnedAlert")
+	secureHook(_G.LegendaryItemAlertSystem, "setUpFunction", "SkinLegendaryItemAlert")
+	secureHook(_G.LootAlertSystem, "setUpFunction", "SkinLootAlert")
+	secureHook(_G.LootUpgradeAlertSystem, "setUpFunction", "SkinLootUpgradeAlert")
+	secureHook(_G.MoneyWonAlertSystem, "setUpFunction", "SkinMoneyWonAlert")
+	secureHook(_G.HonorAwardedAlertSystem, "setUpFunction", "SkinMoneyWonAlert")
+	secureHook(_G.EntitlementDeliveredAlertSystem, "setUpFunction", "SkinAlert")
+	secureHook(_G.RafRewardDeliveredAlertSystem, "setUpFunction", "SkinRafRewardDeliveredAlert")
+	secureHook(_G.HousingItemEarnedAlertFrameSystem, "setUpFunction", "SkinHousingItemEarnedAlert")
+	secureHook(_G.InitiativeTaskCompleteAlertFrameSystem, "setUpFunction", "SkinHousingItemEarnedAlert")
 
 	-- Professions
-	self:SecureHook(_G.DigsiteCompleteAlertSystem, "setUpFunction", "SkinDigsiteCompleteAlert")
-	self:SecureHook(_G.NewRecipeLearnedAlertSystem, "setUpFunction", "SkinNewRecipeLearnedAlert")
-	self:SecureHook(_G.SkillLineSpecsUnlockedAlertSystem, "setUpFunction", "SkinNewRecipeLearnedAlert")
+	secureHook(_G.DigsiteCompleteAlertSystem, "setUpFunction", "SkinDigsiteCompleteAlert")
+	secureHook(_G.NewRecipeLearnedAlertSystem, "setUpFunction", "SkinNewRecipeLearnedAlert")
+	secureHook(_G.SkillLineSpecsUnlockedAlertSystem, "setUpFunction", "SkinNewRecipeLearnedAlert")
 
 	-- Pets/Mounts
-	self:SecureHook(_G.NewPetAlertSystem, "setUpFunction", "SkinNewItemAlert")
-	self:SecureHook(_G.NewMountAlertSystem, "setUpFunction", "SkinNewItemAlert")
-	self:SecureHook(_G.NewToyAlertSystem, "setUpFunction", "SkinNewItemAlert")
+	secureHook(_G.NewPetAlertSystem, "setUpFunction", "SkinNewItemAlert")
+	secureHook(_G.NewMountAlertSystem, "setUpFunction", "SkinNewItemAlert")
+	secureHook(_G.NewToyAlertSystem, "setUpFunction", "SkinNewItemAlert")
 
 	-- Cosmetics
-	self:SecureHook(_G.NewCosmeticAlertFrameSystem, "setUpFunction", "SkinNewItemAlert")
+	secureHook(_G.NewCosmeticAlertFrameSystem, "setUpFunction", "SkinNewItemAlert")
 
-	-- Reward Icons
-	self:SecureHook("StandardRewardAlertFrame_AdjustRewardAnchors", "SkinAlertRewardIcons")
+	-- Reward Icons (retail FrameXML function, nil on 3.3.5a)
+	secureHook(_G.StandardRewardAlertFrame_AdjustRewardAnchors, "SkinAlertRewardIcons")
 end
 
 S:AddCallback("AlertFrames")

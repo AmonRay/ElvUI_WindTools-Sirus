@@ -10,9 +10,10 @@ local ipairs = ipairs
 local pairs = pairs
 local strsub = strsub
 
-local ChatFrameUtil_ActivateChat = ChatFrameUtil.ActivateChat
-local ChatFrameUtil_AddMessageEventFilter = ChatFrameUtil.AddMessageEventFilter
-local ChatFrameUtil_ChooseBoxForSend = ChatFrameUtil.ChooseBoxForSend
+local ChatFrameUtil = _G.ChatFrameUtil
+local ChatFrameUtil_ActivateChat = ChatFrameUtil and ChatFrameUtil.ActivateChat or ChatEdit_ActivateChat
+local ChatFrameUtil_AddMessageEventFilter = ChatFrame_AddMessageEventFilter
+local ChatFrameUtil_ChooseBoxForSend = ChatFrameUtil and ChatFrameUtil.ChooseBoxForSend or ChatEdit_ChooseBoxForSend
 local CreateFrame = CreateFrame
 
 local C_ChatBubbles_GetAllChatBubbles = C_ChatBubbles and C_ChatBubbles.GetAllChatBubbles or function() return {} end
@@ -78,8 +79,8 @@ local emotes = {
 	{ key = "sheep", zhTW = "羊", zhCN = "羊", texture = "Interface\\TargetingFrame\\UI-TargetingFrame-Sheep" },
 }
 
-local function EmoteButton_OnClick(self, button)
-	local editBox = ChatFrameUtil_ChooseBoxForSend()
+local function EmoteButton_OnClick(self, button)	local editBox = ChatFrameUtil_ChooseBoxForSend()
+	if not editBox then return end
 	ChatFrameUtil_ActivateChat(editBox)
 	editBox:SetText(gsub(editBox:GetText(), "{$", "") .. self.emote)
 	if button == "LeftButton" then
@@ -229,7 +230,7 @@ function CE:ParseChatBubbles()
 	for _, frame in pairs(C_ChatBubbles_GetAllChatBubbles()) do
 		local holder = frame:GetChildren()
 		---@cast holder ChatBubbleTemplate
-		if holder and not holder:IsForbidden() then
+		if holder and (not holder.IsForbidden or not holder:IsForbidden()) then
 			local str = holder and holder.String
 			if str then
 				local oldMessage = str:GetText()

@@ -436,7 +436,8 @@ local function GetFrame(frameOrName)
 end
 
 function MF:Remember(frame)
-	if not self.db.rememberPositions or self.StopRunning then
+	local db = self:GetDB()
+	if not db or not db.rememberPositions or self.StopRunning then
 		return
 	end
 
@@ -447,10 +448,11 @@ function MF:Remember(frame)
 
 	local numPoints = frame:GetNumPoints()
 	if numPoints and numPoints > 0 then
-		self.db.framePositions[path] = {}
+		db.framePositions = db.framePositions or {}
+		db.framePositions[path] = {}
 		for index = 1, numPoints do
 			local anchorPoint, relativeFrame, relativePoint, offX, offY = frame:GetPoint(index)
-			self.db.framePositions[path][index] = {
+			db.framePositions[path][index] = {
 				anchorPoint = anchorPoint,
 				relativeFrame = relativeFrame and relativeFrame:GetName() or "UIParent",
 				relativePoint = relativePoint,
@@ -464,22 +466,25 @@ function MF:Remember(frame)
 end
 
 function MF:Reposition(frame, _, _, _, _, _, skip)
-	if skip or InCombatLockdown() or not self.db or not self.db.rememberPositions or self.StopRunning then
+	local db = self:GetDB()
+	if skip or InCombatLockdown() or not db or not db.rememberPositions or self.StopRunning then
 		return
 	end
 
 	local path = framePaths[frame]
 	if path == "" or ignorePositionRememberingFrames[path] then
-		self.db.framePositions[path] = nil
+		if db.framePositions then
+			db.framePositions[path] = nil
+		end
 		return
 	end
 
-	if not path or not self.db.framePositions[path] or #self.db.framePositions[path] == 0 then
+	if not path or not db.framePositions or not db.framePositions[path] or #db.framePositions[path] == 0 then
 		return
 	end
 
 	frame:ClearAllPoints()
-	for _, record in pairs(self.db.framePositions[path]) do
+	for _, record in pairs(db.framePositions[path]) do
 		if type(record.relativeFrame) ~= "string" then
 			record.relativeFrame = "UIParent"
 		end
@@ -493,12 +498,13 @@ end
 ---Check and ensure the window is completely within the screen bounds, it not, forget its remembered position
 ---@param frame Frame The frame to check
 function MF:EnsureWindowInTheScreen(frame)
-	if not self.db or not self.db.autoResetOffScreenFrames then
+	local db = self:GetDB()
+	if not db or not db.autoResetOffScreenFrames then
 		return
 	end
 
 	local path = framePaths[frame]
-	if not path or not self.db.framePositions[path] then
+	if not path or not db.framePositions or not db.framePositions[path] then
 		return
 	end
 
@@ -521,7 +527,9 @@ function MF:EnsureWindowInTheScreen(frame)
 	end
 
 	if isOffScreen then
-		self.db.framePositions[path] = nil
+		if db.framePositions then
+			db.framePositions[path] = nil
+		end
 	end
 end
 
@@ -661,7 +669,8 @@ function MF:HandleAddon(_, addon)
 end
 
 function MF:HandleElvUIBag(frameName)
-	if not self.db.elvUIBags then
+	local db = self:GetDB()
+	if not db or not db.elvUIBags then
 		return
 	end
 	local frame = B[frameName]
@@ -691,7 +700,21 @@ end
 ---Check if the MoveFrames module is running
 ---@return boolean Whether the MoveFrames module is running
 function MF:IsRunning()
-	return E.private.WT.misc.moveFrames.enable and not W.Modules.MoveFrames.StopRunning
+	local db = self:GetDB()
+	return db and db.enable and not self.StopRunning
+end
+
+---Get the module DB. `self.db` is cached by Initialize, but hooks can also be
+---installed via InternalHandle (other modules) before/without Initialize ever
+---running — so always fall back to the live private DB path (nil-safe).
+function MF:GetDB()
+	if self.db then
+		return self.db
+	end
+	local private = E.private
+	local wt = private and private.WT
+	local misc = wt and wt.misc
+	return misc and misc.moveFrames
 end
 
 ---Get the move target frame for a given frame
@@ -741,7 +764,10 @@ function MF:Initialize()
 		return
 	end
 
-	self.db = E.private.WT.misc.moveFrames
+	local private = E.private
+	local wt = private and private.WT
+	local misc = wt and wt.misc
+	self.db = misc and misc.moveFrames
 	if not self.db or not self.db.enable then
 		return
 	end

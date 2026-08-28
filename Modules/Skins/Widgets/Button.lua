@@ -24,15 +24,18 @@ function WS:HandleButton(_, button)
 	end
 
 	local db = E.private.WT and E.private.WT.skins and E.private.WT.skins.widgets and E.private.WT.skins.widgets.button
+	if not db then
+		return
+	end
 
-	if db.text.enable then
+	if db.text and db.text.enable then
 		local text = button.Text or button.GetName and button:GetName() and _G[button:GetName() .. "Text"]
 		if text and text.GetTextColor then
 			F.SetFontWithDB(text, db.text.font)
 		end
 	end
 
-	if db.backdrop.enable and (button.template or button.backdrop) then
+	if db.backdrop and db.backdrop.enable and (button.template or button.backdrop) then
 		local parentFrame = button.backdrop or button
 
 		-- Create background

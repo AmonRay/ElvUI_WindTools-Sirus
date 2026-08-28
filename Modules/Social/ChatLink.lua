@@ -10,13 +10,46 @@ local select = select
 local strmatch = strmatch
 local tonumber = tonumber
 
-local ChatFrameUtil_AddMessageEventFilter = ChatFrameUtil.AddMessageEventFilter
+local ChatFrameUtil = _G.ChatFrameUtil
+local ChatFrameUtil_AddMessageEventFilter = ChatFrame_AddMessageEventFilter or function() end
 local GetAchievementInfo = GetAchievementInfo
 local GetPvpTalentInfoByID = GetPvpTalentInfoByID
 local GetTalentInfoByID = GetTalentInfoByID
+local GetTalentInfo = GetTalentInfo
 
-local C_ChallengeMode_GetMapUIInfo = C_ChallengeMode and C_ChallengeMode.GetMapUIInfo or function() return nil end
-local C_CurrencyInfo_GetCurrencyInfo = C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo or function() return nil end
+-- GetTalentInfoByID is not documented by this client, but addons (Details) call it
+-- with the retail signature (talentID, name, texture, selected, available). The
+-- classic signature (tabIndex, tier, column, rank) has no icon, so fall back to
+-- GetTalentInfo(tab, tier, column) -> (name, icon, ...) when the third return is
+-- not a texture.
+local function GetTalentTextureByID(talentID)
+	if not GetTalentInfoByID or not GetTalentInfo then
+		return
+	end
+
+	local first, second, third = GetTalentInfoByID(talentID)
+	if not first then
+		return
+	end
+
+	if third and first ~= talentID then -- classic (tabIndex, tier, column, rank)
+		return select(2, GetTalentInfo(first, second, third))
+	end
+
+	return third -- retail (talentID, name, texture, ...)
+end
+
+-- PvP talents are retail-only; the helper stays inert when the API is absent.
+local function GetPvPTalentTextureByID(pvpTalentID)
+	if not GetPvpTalentInfoByID then
+		return
+	end
+
+	return select(3, GetPvpTalentInfoByID(pvpTalentID))
+end
+
+local C_ChallengeMode_GetMapUIInfo = C_ChallengeMode and C_ChallengeMode.GetMapUIInfo
+local C_CurrencyInfo_GetCurrencyInfo = C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo
 local C_Item_GetDetailedItemLevelInfo = W.Compatibility.GetDetailedItemLevelInfo
 local C_Item_GetItemIconByID = W.Compatibility.GetItemIconByID
 local C_Item_GetItemInfoInstant = W.Compatibility.GetItemInfoInstant
@@ -24,10 +57,10 @@ local C_Item_GetItemNameByID = C_Item and C_Item.GetItemNameByID or function(ite
 local C_Soulbinds_GetConduitCollectionData = C_Soulbinds and C_Soulbinds.GetConduitCollectionData or function() return nil end
 local C_Spell_GetSpellTexture = W.Compatibility.GetSpellTexture
 
-local RETRIEVING_ITEM_INFO = RETRIEVING_ITEM_INFO
-local ITEM_LEVEL = ITEM_LEVEL
-local ITEM_LEVEL_ALT = ITEM_LEVEL_ALT
-local ITEM_MIN_LEVEL = ITEM_MIN_LEVEL
+local RETRIEVING_ITEM_INFO = RETRIEVING_ITEM_INFO or "Retrieving item information"
+local ITEM_LEVEL = ITEM_LEVEL or "Item Level %d"
+local ITEM_LEVEL_ALT = ITEM_LEVEL_ALT or "Item Level %d (%d)"
+local ITEM_MIN_LEVEL = ITEM_MIN_LEVEL or "Requires level %d"
 
 local MATCH_ITEM_LEVEL = ITEM_LEVEL:gsub("%%d", "(%%d+)")
 local MATCH_MIN_LEVEL = ITEM_MIN_LEVEL:gsub("%%d", "(%%d+)")
@@ -132,9 +165,12 @@ local function AddItemInfo(link)
 
 	local level, slot
 
-	-- item level: tooltip display value, fallback if hyperlink data not ready
+	-- item level: tooltip display value; the client has no GetDetailedItemLevelInfo.
 	if CL.db.level then
-		level = GetDisplayedItemLevelFromHyperlink(link) or C_Item_GetDetailedItemLevelInfo(link)
+		level = GetDisplayedItemLevelFromHyperlink(link)
+		if not level and C_Item_GetDetailedItemLevelInfo then
+			level = C_Item_GetDetailedItemLevelInfo(link)
+		end
 	end
 
 	-- armor
@@ -261,7 +297,7 @@ local function AddPvPTalentInfo(link)
 
 	if CL.db.icon then
 		local pvpTalentIDNum = tonumber(id)
-		local texture = pvpTalentIDNum and select(3, GetPvpTalentInfoByID(pvpTalentIDNum))
+		local texture = pvpTalentIDNum and GetPvPTalentTextureByID(pvpTalentIDNum)
 		local icon = texture and F.GetIconString(texture, CL.db.iconHeight, CL.db.iconWidth, CL.db.keepRatio)
 		if icon then
 			link = icon .. " " .. link
@@ -280,7 +316,7 @@ local function AddTalentInfo(link)
 
 	if CL.db.icon then
 		local talentIDNum = tonumber(id)
-		local texture = talentIDNum and select(3, GetTalentInfoByID(talentIDNum))
+		local texture = talentIDNum and GetTalentTextureByID(talentIDNum)
 		local icon = texture and F.GetIconString(texture, CL.db.iconHeight, CL.db.iconWidth, CL.db.keepRatio)
 		if icon then
 			link = icon .. " " .. link
@@ -299,6 +335,8 @@ local function AddAchievementInfo(link)
 
 	if CL.db.icon then
 		local achievementIDNum = tonumber(id)
+		-- This client returns the icon at index 10 (id, name, points, completed,
+		-- month, day, year, description, flags, icon, rewardText) -- see AlertFrames.lua.
 		local texture = achievementIDNum and select(10, GetAchievementInfo(achievementIDNum))
 		local icon = texture and F.GetIconString(texture, CL.db.iconHeight, CL.db.iconWidth, CL.db.keepRatio)
 		if icon then
@@ -317,10 +355,10 @@ local function AddCurrencyInfo(link)
 	end
 
 	if CL.db.icon then
-		local info = C_CurrencyInfo_GetCurrencyInfo(id)
-		local icon = info
-			and info.iconFileID
-			and F.GetIconString(info.iconFileID, CL.db.iconHeight, CL.db.iconWidth, CL.db.keepRatio)
+		-- This client's C_CurrencyInfo.GetCurrencyInfo returns
+		-- (name, quantity, icon, ...) -- icon is the third return.
+		local icon = C_CurrencyInfo_GetCurrencyInfo and select(3, C_CurrencyInfo_GetCurrencyInfo(id))
+		icon = icon and F.GetIconString(icon, CL.db.iconHeight, CL.db.iconWidth, CL.db.keepRatio)
 		if icon then
 			link = icon .. " " .. link
 		end

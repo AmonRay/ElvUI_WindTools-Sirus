@@ -20,7 +20,9 @@ local AchievementFrame_LoadUI = AchievementFrame_LoadUI
 local ClearAchievementComparisonUnit = ClearAchievementComparisonUnit
 local GetAchievementComparisonInfo = GetAchievementComparisonInfo
 local GetComparisonStatistic = GetComparisonStatistic
-local GetMaxLevelForPlayerExpansion = GetMaxLevelForPlayerExpansion
+local GetMaxLevelForPlayerExpansion = GetMaxLevelForPlayerExpansion or function()
+	return UnitLevel and UnitLevel("player") or 80
+end
 local GetStatistic = GetStatistic
 local GetTime = GetTime
 local HideUIPanel = HideUIPanel
@@ -35,7 +37,7 @@ local UnmuteSoundFile = UnmuteSoundFile
 
 local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
 
-local MAX_PLAYER_LEVEL = GetMaxLevelForPlayerExpansion()
+local MAX_PLAYER_LEVEL = GetMaxLevelForPlayerExpansion() or (UnitLevel and UnitLevel("player")) or 80
 
 local starIconString = format("|T%s:0|t ", W.Media.Icons.star)
 
@@ -426,5 +428,12 @@ function T:InitializeProgression()
 	hooksecurefunc(_G.AchievementFrame, "SetShown", OnAchievementShow)
 end
 
-T:AddInspectInfoCallback(2, "Progression", true)
-T:AddCallback("InitializeProgression")
+if T.AddCallback then
+	T:AddInspectInfoCallback(2, "Progression", true)
+	T:AddCallback("InitializeProgression")
+elseif not T.__windtoolsCoreMissingWarned then
+	T.__windtoolsCoreMissingWarned = true
+	F.Developer.ThrowError(
+		"Tooltips Progression was skipped: Modules/Tooltips/Core.lua did not load (T:AddCallback is missing), so tooltip callbacks were not registered. Reinstall ElvUI_WindTools with a complete copy of all files, then /reload."
+	)
+end

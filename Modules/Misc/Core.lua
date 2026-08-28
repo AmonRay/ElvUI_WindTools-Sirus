@@ -53,7 +53,9 @@ end
 ---@param object function[] Array of callback functions
 function M:CallLoadedAddon(addonName, object)
 	for _, func in next, object do
-		xpcall(func, F.Developer.LogDebug, self)
+		xpcall(function()
+			return func(self)
+		end, F.Developer.LogDebug)
 	end
 
 	self.addonsToLoad[addonName] = nil
@@ -75,7 +77,9 @@ end
 
 function M:Initialize()
 	for index, func in next, self.nonAddonsToLoad do
-		xpcall(func, F.Developer.LogDebug, self)
+		xpcall(function()
+			return func(self)
+		end, F.Developer.LogDebug)
 		self.nonAddonsToLoad[index] = nil
 	end
 
@@ -89,7 +93,9 @@ end
 
 function M:ProfileUpdate()
 	for index, func in next, self.updateProfile do
-		xpcall(func, F.Developer.LogDebug, self)
+		xpcall(function()
+			return func(self)
+		end, F.Developer.LogDebug)
 		self.updateProfile[index] = nil
 	end
 end

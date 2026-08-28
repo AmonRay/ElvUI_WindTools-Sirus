@@ -105,14 +105,19 @@ function S:LossOfControlFrame()
 		return
 	end
 
+	-- LossOfControlFrame comes from the LossOfControl addon; skip if absent
+	if not _G.LossOfControlFrame then
+		return
+	end
+
 	self:SecureHook(_G.LossOfControlFrame, "SetUpDisplay", "LossOfControlFrame_SetUpDisplay")
 	self:SecureHook(_G.LossOfControlFrame.AbilityName, "Show", function(f)
-		if self.db.lossOfControl.abilityName.hide then
+		if self.db and self.db.lossOfControl and self.db.lossOfControl.abilityName and self.db.lossOfControl.abilityName.hide then
 			f:Hide()
 		end
 	end)
 	self:SecureHook(_G.LossOfControlFrame.TimeLeft, "Show", function(f)
-		if self.db.lossOfControl.timeLeft.hide then
+		if self.db and self.db.lossOfControl and self.db.lossOfControl.timeLeft and self.db.lossOfControl.timeLeft.hide then
 			f:Hide()
 		end
 	end)

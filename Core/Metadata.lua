@@ -6,13 +6,17 @@ local pairs = pairs
 local tinsert = tinsert
 local tostring = tostring
 
-local GetCurrentRegionName = GetCurrentRegionName
-local GetLFGDungeonInfo = GetLFGDungeonInfo
-local GetLocale = GetLocale
-local GetMaxLevelForPlayerExpansion = GetMaxLevelForPlayerExpansion
-local GetRealmID = GetRealmID
-local GetRealmName = GetRealmName
-local GetSpecializationInfoForClassID = GetSpecializationInfoForClassID
+local GetCurrentRegionName = GetCurrentRegionName or function()
+	return "US"
+end
+local GetLFGDungeonInfo = GetLFGDungeonInfo or function() return nil end
+local GetLocale = GetLocale or function() return "enUS" end
+local GetMaxLevelForPlayerExpansion = GetMaxLevelForPlayerExpansion or function()
+	return UnitLevel and UnitLevel("player") or 80
+end
+local GetRealmID = GetRealmID or function() return 0 end
+local GetRealmName = GetRealmName or function() return GetCVar and GetCVar("realmName") or "Unknown" end
+local GetSpecializationInfoForClassID = GetSpecializationInfoForClassID or function() return nil end
 
 local C_ChallengeMode = _G.C_ChallengeMode
 local C_CVar = _G.C_CVar
@@ -35,7 +39,7 @@ W.SupportElvUIVersion = 0
 W.UseKeyDown = C_CVar_GetCVarBool("ActionButtonUseKeyDown")
 
 -- Game
-W.MaxLevelForPlayerExpansion = GetMaxLevelForPlayerExpansion()
+W.MaxLevelForPlayerExpansion = GetMaxLevelForPlayerExpansion() or (UnitLevel and UnitLevel("player")) or 80
 
 -- Mythic+
 W.MythicPlusMapData = {

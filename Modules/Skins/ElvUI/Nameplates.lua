@@ -30,8 +30,14 @@ function S:ElvUI_UnitFrames()
 		return
 	end
 
-	self:SecureHook(NP, "StylePlate", "NP_StylePlate")
-	self:SecureHook(NP, "Construct_AuraIcon", "NP_Construct_AuraIcon")
+	-- StylePlate is a retail-only method; the Wrath fork styles plates with a
+	-- different API, so the hook is only installed when the method exists.
+	if NP.StylePlate then
+		self:SecureHook(NP, "StylePlate", "NP_StylePlate")
+	end
+	if NP.Construct_AuraIcon then
+		self:SecureHook(NP, "Construct_AuraIcon", "NP_Construct_AuraIcon")
+	end
 end
 
 S:AddCallback("ElvUI_UnitFrames")

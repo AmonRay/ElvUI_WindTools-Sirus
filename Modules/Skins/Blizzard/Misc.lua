@@ -34,9 +34,13 @@ function S:BlizzardMiscFrames()
 
 	self:CreateShadow(_G.AutoCompleteBox)
 
-	-- Skip Frame
-	self:SecureHook("CinematicFrame_UpdateLettboxForAspectRatio", "SkinSkipButton")
-	self:SecureHook("MovieFrame_PlayMovie", "SkinSkipButton")
+	-- Skip Frame (retail FrameXML globals; absent on 3.3.5a)
+	if _G.CinematicFrame_UpdateLettboxForAspectRatio then
+		self:SecureHook("CinematicFrame_UpdateLettboxForAspectRatio", "SkinSkipButton")
+	end
+	if _G.MovieFrame_PlayMovie then
+		self:SecureHook("MovieFrame_PlayMovie", "SkinSkipButton")
+	end
 
 	-- Chat Menus
 	local chatMenus = { "ChatMenu", "EmoteMenu", "LanguageMenu", "VoiceMacroMenu" }
@@ -117,6 +121,12 @@ function S:SkinMenu(_, manager, _, menuDescription)
 	menuDescription:AddMenuAcquiredCallback(createShadow)
 end
 
-S:SecureHook(ES, "SkinMenu")
-S:AddCallback("BlizzardMiscFrames")
-S:AddCallbackForAddon("Blizzard_DeathRecap")
+if ES and type(ES.SkinMenu) == "function" then
+	S:SecureHook(ES, "SkinMenu")
+end
+if S.AddCallback then
+	S:AddCallback("BlizzardMiscFrames")
+end
+if S.AddCallbackForAddon then
+	S:AddCallbackForAddon("Blizzard_DeathRecap")
+end

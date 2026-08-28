@@ -19,7 +19,7 @@ local xpcall = xpcall
 
 local InCombatLockdown = InCombatLockdown
 
-local Compatibility = W.Compatibility
+local Compatibility = W.Compatibility or {}
 local C_PartyInfo_InviteUnit = Compatibility.InviteUnit
 local C_UI_Reload = Compatibility.ReloadUI
 
@@ -30,7 +30,9 @@ local ACCEPT, CANCEL = ACCEPT, CANCEL
 W.RegisteredModules = {}
 W.Changelog = {}
 
-W:InitializeMetadata()
+if type(W.InitializeMetadata) == "function" then
+	W:InitializeMetadata()
+end
 
 -- Alerts
 E.PopupDialogs.WINDTOOLS_ELVUI_OUTDATED = {
@@ -186,7 +188,11 @@ function W:InitializeModules()
 			F.Developer.LogWarning("Skipping unavailable module: " .. tostring(moduleName))
 		else
 			if module.Initialize then
-				xpcall(module.Initialize, F.Developer.LogDebug, module)
+				xpcall(function()
+					return module.Initialize(module)
+				end, function(err)
+					F.Developer.ThrowError(("%s failed to initialize: %s"):format(tostring(moduleName), tostring(err)))
+				end)
 			end
 		end
 	end
@@ -203,7 +209,11 @@ function W:UpdateModules()
 	for _, moduleName in pairs(self.RegisteredModules) do
 		local module = W:GetModule(moduleName)
 		if module and module.ProfileUpdate then
-			pcall(module.ProfileUpdate, module)
+			xpcall(function()
+				return module.ProfileUpdate(module)
+			end, function(err)
+				F.Developer.ThrowError(("%s failed to update: %s"):format(tostring(moduleName), tostring(err)))
+			end)
 		end
 	end
 end

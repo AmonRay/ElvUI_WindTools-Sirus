@@ -96,7 +96,10 @@ function A:Initialize()
 		return
 	end
 
-	self:RawHook(UF, "SetTexture_HealComm")
+	-- UF.SetTexture_HealComm is a HealComm-integrated method absent on this fork
+	if UF and type(UF.SetTexture_HealComm) == "function" then
+		self:RawHook(UF, "SetTexture_HealComm")
+	end
 
 	self.initialized = true
 end

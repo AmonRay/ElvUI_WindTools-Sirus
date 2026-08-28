@@ -64,13 +64,15 @@ function T:AddInspectInfoCallback(priority, inspectFunc, useModifier, clearFunc)
 end
 
 function T:ClearInspectInfo(tt)
-	if tt:IsForbidden() then
+	if not tt or (tt.IsForbidden and tt:IsForbidden()) then
 		return
 	end
 
 	-- Run all registered callbacks (clear)
 	for _, func in next, self.clearInspect do
-		xpcall(func, F.Developer.ThrowError, self, tt)
+		xpcall(function()
+			return func(self, tt)
+		end, F.Developer.ThrowError)
 	end
 end
 
@@ -113,7 +115,14 @@ function T:InspectInfo(tt, data, triedTimes)
 
 	triedTimes = triedTimes or 0
 
-	local unit = ET:GetDisplayedUnit(tt)
+	-- ET:GetDisplayedUnit is a retail ElvUI method absent on the 3.3.5a fork;
+	-- fall back to GameTooltip:GetUnit (Wrath API) when present.
+	local unit
+	if ET and type(ET.GetDisplayedUnit) == "function" then
+		unit = ET:GetDisplayedUnit(tt)
+	elseif tt and tt.GetUnit then
+		unit = tt:GetUnit()
+	end
 
 	if not unit then
 		local GMF = E:GetMouseFocus()
@@ -132,7 +141,9 @@ function T:InspectInfo(tt, data, triedTimes)
 
 	-- Run all registered callbacks (normal)
 	for _, func in next, self.normalInspect do
-		xpcall(func, F.Developer.ThrowError, self, tt, unit, data.guid)
+		xpcall(function()
+			return func(self, tt, unit, data.guid)
+		end, F.Developer.ThrowError)
 	end
 
 	-- General
@@ -145,7 +156,7 @@ function T:InspectInfo(tt, data, triedTimes)
 	local itemLevelAvailable = isPlayerUnit and not inCombatLockdown and ET.db.inspectDataEnable
 
 	if self.profiledb.elvUITweaks.forceItemLevel and not isInspecting then
-		if not isShiftKeyDown and itemLevelAvailable and not tt.ItemLevelShown then
+		if not isShiftKeyDown and itemLevelAvailable and not tt.ItemLevelShown and ET and type(ET.AddInspectInfo) == "function" then
 			local _, class = UnitClass(unit)
 			local color = class and E:ClassColor(class) or RAID_CLASS_COLORS_PRIEST
 			ET:AddInspectInfo(tt, unit, 0, color.r, color.g, color.b)
@@ -167,14 +178,16 @@ function T:InspectInfo(tt, data, triedTimes)
 
 	-- Run all registered callbacks (modifier)
 	for _, func in next, self.modifierInspect do
-		xpcall(func, F.Developer.ThrowError, self, tt, unit, data.guid)
+		xpcall(function()
+			return func(self, tt, unit, data.guid)
+		end, F.Developer.ThrowError)
 	end
 
 	tt.windInspectLoaded = true
 end
 
 function T:ElvUIRemoveTrashLines(_, tt)
-	if tt:IsForbidden() then
+	if not tt or (tt.IsForbidden and tt:IsForbidden()) then
 		return
 	end
 
@@ -194,8 +207,13 @@ end
 
 function T:Event(event, ...)
 	if self.eventCallback[event] then
+		-- Lua 5.1: '...' is a compile error inside a non-vararg closure, so
+		-- capture the event args first and unpack them in the handler.
+		local args = { ... }
 		for _, func in next, self.eventCallback[event] do
-			xpcall(func, F.Developer.ThrowError, self, event, ...)
+			xpcall(function()
+				return func(self, event, unpack(args))
+			end, F.Developer.ThrowError)
 		end
 	end
 end
@@ -212,7 +230,9 @@ function T:Initialize()
 	self.db = E.private.WT.tooltips
 	self.profiledb = E.db.WT.tooltips
 	for index, func in next, self.load do
-		xpcall(func, F.Developer.ThrowError, self)
+		xpcall(function()
+			return func(self)
+		end, F.Developer.ThrowError)
 		self.load[index] = nil
 	end
 
@@ -220,9 +240,17 @@ function T:Initialize()
 		self:RegisterEvent(name, "Event")
 	end
 
-	self:RawHook(ET, "AddMythicInfo")
-	self:SecureHook(ET, "SetUnitText", "SetUnitText")
-	self:SecureHook(ET, "RemoveTrashLines", "ElvUIRemoveTrashLines")
+	-- ET here is ElvUI's Tooltips module; AddMythicInfo is mythic+-retail and some
+	-- of these methods are absent on the 3.3.5a fork, so guard each hook.
+	if ET and type(ET.AddMythicInfo) == "function" then
+		self:RawHook(ET, "AddMythicInfo")
+	end
+	if ET and type(ET.SetUnitText) == "function" then
+		self:SecureHook(ET, "SetUnitText", "SetUnitText")
+	end
+	if ET and type(ET.RemoveTrashLines) == "function" then
+		self:SecureHook(ET, "RemoveTrashLines", "ElvUIRemoveTrashLines")
+	end
 	self:SecureHookScript(GameTooltip, "OnTooltipCleared", "ClearInspectInfo")
 
 	self.initialized = true
@@ -231,9 +259,13 @@ end
 function T:ProfileUpdate()
 	self.profiledb = E.db.WT.tooltips
 	for index, func in next, self.updateProfile do
-		xpcall(func, F.Developer.ThrowError, self)
+		xpcall(function()
+			return func(self)
+		end, F.Developer.ThrowError)
 		self.updateProfile[index] = nil
 	end
 end
 
-W:RegisterModule(T:GetName())
+if W and type(W.RegisterModule) == "function" then
+	W:RegisterModule(T:GetName())
+end

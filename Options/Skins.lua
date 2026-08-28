@@ -2089,226 +2089,155 @@ options.blizzard = {
 	},
 }
 
-options.damageMeter = {
+options.details = {
 	order = 5,
 	type = "group",
-	name = L["Damage Meter"],
+	name = L["Details"],
 	get = function(info)
-		return E.private.WT.skins.damageMeter[info[#info]]
+		return E.private.WT.skins.details[info[#info]]
 	end,
 	set = function(info, value)
-		E.private.WT.skins.damageMeter[info[#info]] = value
-		E:StaticPopup_Show("PRIVATE_RL")
+		E.private.WT.skins.details[info[#info]] = value
 	end,
 	disabled = function()
-		return not E.private.WT.skins.enable
+		return not E.private.WT.skins.enable or not E.private.WT.skins.addons.details
 	end,
 	args = {
-		enable = {
+		desc = {
 			order = 1,
+			type = "description",
+			name = L["Style Details damage meter windows with ElvUI textures and fonts."],
+			fontSize = "medium",
+		},
+		enable = {
+			order = 2,
 			type = "toggle",
 			name = L["Enable"],
-		},
-		modes = {
-			order = 2,
-			type = "group",
-			name = L["General"],
-			get = function(info)
-				return E.private.WT.skins.damageMeter[info[#info]]
-			end,
-			set = function(info, value)
-				E.private.WT.skins.damageMeter[info[#info]] = value
-				E:StaticPopup_Show("PRIVATE_RL")
-			end,
-			inline = true,
-			disabled = function()
-				return not E.private.WT.skins.damageMeter.enable
-			end,
-			args = {
-				windowBackdrop = {
-					order = 1,
-					type = "select",
-					name = L["Window Backdrop"],
-					values = {
-						always = L["Always"],
-						mouseover = L["Mouse Over"],
-						hide = L["Hide"],
-					},
-				},
-				headerPart = {
-					order = 2,
-					type = "select",
-					name = L["Header"],
-					get = function()
-						local mode = E.private.WT.skins.damageMeter.headerPart
-						return mode == "always" and "always" or "mouseover"
-					end,
-					set = function(_, value)
-						E.private.WT.skins.damageMeter.headerPart = value == "always" and "always" or "mouseover"
-						E:StaticPopup_Show("PRIVATE_RL")
-					end,
-					values = {
-						always = L["Always"],
-						mouseover = L["Mouse Over"],
-					},
-				},
-				headerBackdrop = {
-					order = 3,
-					type = "select",
-					name = L["Header Backdrop"],
-					get = function()
-						local mode = E.private.WT.skins.damageMeter.headerBackdrop
-						return mode == "hide" and "hide" or "always"
-					end,
-					set = function(_, value)
-						E.private.WT.skins.damageMeter.headerBackdrop = value == "hide" and "hide" or "always"
-						E:StaticPopup_Show("PRIVATE_RL")
-					end,
-					values = {
-						always = L["Always"],
-						hide = L["Hide"],
-					},
-				},
-				scrollBar = {
-					order = 4,
-					type = "select",
-					name = L["Scrollbar"],
-					values = {
-						hide = L["Hide"],
-						default = L["Default"],
-						mouseover = L["Mouse Over"],
-					},
-				},
-				fadeTime = {
-					order = 5,
-					type = "range",
-					name = L["Fade Time"],
-					min = 0,
-					max = 1,
-					step = 0.01,
-				},
-			},
+			width = "full",
 		},
 		bar = {
 			order = 3,
 			type = "group",
-			name = L["Bar Texture"],
 			inline = true,
+			name = L["Bar"],
 			get = function(info)
-				return E.private.WT.skins.damageMeter.bar[info[#info]]
+				return E.private.WT.skins.details.bar[info[#info]]
 			end,
 			set = function(info, value)
-				E.private.WT.skins.damageMeter.bar[info[#info]] = value
-				E:StaticPopup_Show("PRIVATE_RL")
+				E.private.WT.skins.details.bar[info[#info]] = value
 			end,
 			disabled = function()
-				return not E.private.WT.skins.damageMeter.enable
+				return not E.private.WT.skins.details.enable
 			end,
 			args = {
 				texture = {
 					order = 1,
 					type = "select",
-					name = L["Bar Texture"],
-					dialogControl = "LSM30_Statusbar",
+					name = L["Texture"],
 					values = LSM:HashTable("statusbar"),
 				},
 				alpha = {
 					order = 2,
-					type = "range",
 					name = L["Alpha"],
+					type = "range",
 					min = 0,
 					max = 1,
-					step = 0.01,
-					isPercent = true,
+					step = 0.05,
 				},
-				nameText = {
+				font = {
 					order = 3,
 					type = "group",
-					name = L["Name"],
 					inline = true,
+					name = L["Font"],
 					get = function(info)
-						return E.private.WT.skins.damageMeter.bar.font.name[info[#info]]
+						return E.private.WT.skins.details.bar.font[info[#info - 1]][info[#info]]
 					end,
 					set = function(info, value)
-						E.private.WT.skins.damageMeter.bar.font.name[info[#info]] = value
-						E:StaticPopup_Show("PRIVATE_RL")
+						E.private.WT.skins.details.bar.font[info[#info - 1]][info[#info]] = value
 					end,
 					args = {
 						name = {
 							order = 1,
-							type = "select",
-							dialogControl = "LSM30_Font",
-							name = L["Font"],
-							values = LSM:HashTable("font"),
-						},
-						size = {
-							order = 2,
-							type = "range",
-							name = L["Size"],
-							min = 5,
-							max = 32,
-							step = 1,
-						},
-						style = {
-							order = 3,
-							type = "select",
-							name = L["Outline"],
-							values = {
-								NONE = L["None"],
-								OUTLINE = L["Outline"],
-								THICKOUTLINE = L["Thick"],
-								SHADOW = L["|cff888888Shadow|r"],
-								SHADOWOUTLINE = L["|cff888888Shadow|r Outline"],
-								SHADOWTHICKOUTLINE = L["|cff888888Shadow|r Thick"],
-								MONOCHROME = L["|cFFAAAAAAMono|r"],
-								MONOCHROMEOUTLINE = L["|cFFAAAAAAMono|r Outline"],
-								MONOCHROMETHICKOUTLINE = L["|cFFAAAAAAMono|r Thick"],
+							type = "group",
+							inline = true,
+							name = L["Name"],
+							get = function(info)
+								return E.private.WT.skins.details.bar.font.name[info[#info]]
+							end,
+							set = function(info, value)
+								E.private.WT.skins.details.bar.font.name[info[#info]] = value
+							end,
+							args = {
+								font = {
+									order = 1,
+									type = "select",
+									dialogControl = "LSM30_Font",
+									name = L["Font"],
+									values = LSM:HashTable("font"),
+								},
+								style = {
+									order = 2,
+									type = "select",
+									name = L["Outline"],
+									values = {
+										NONE = L["None"],
+										OUTLINE = L["Outline"],
+										THICKOUTLINE = L["Thick"],
+										SHADOW = L["|cff888888Shadow|r"],
+										SHADOWOUTLINE = L["|cff888888Shadow|r Outline"],
+										SHADOWTHICKOUTLINE = L["|cff888888Shadow|r Thick"],
+									},
+								},
+								size = {
+									order = 3,
+									name = L["Size"],
+									type = "range",
+									min = 5,
+									max = 60,
+									step = 1,
+								},
 							},
 						},
-					},
-				},
-				valueText = {
-					order = 4,
-					type = "group",
-					name = L["Value"],
-					inline = true,
-					get = function(info)
-						return E.private.WT.skins.damageMeter.bar.font.value[info[#info]]
-					end,
-					set = function(info, value)
-						E.private.WT.skins.damageMeter.bar.font.value[info[#info]] = value
-						E:StaticPopup_Show("PRIVATE_RL")
-					end,
-					args = {
-						name = {
-							order = 1,
-							type = "select",
-							dialogControl = "LSM30_Font",
-							name = L["Font"],
-							values = LSM:HashTable("font"),
-						},
-						size = {
+						value = {
 							order = 2,
-							type = "range",
-							name = L["Size"],
-							min = 5,
-							max = 32,
-							step = 1,
-						},
-						style = {
-							order = 3,
-							type = "select",
-							name = L["Outline"],
-							values = {
-								NONE = L["None"],
-								OUTLINE = L["Outline"],
-								THICKOUTLINE = L["Thick"],
-								SHADOW = L["|cff888888Shadow|r"],
-								SHADOWOUTLINE = L["|cff888888Shadow|r Outline"],
-								SHADOWTHICKOUTLINE = L["|cff888888Shadow|r Thick"],
-								MONOCHROME = L["|cFFAAAAAAMono|r"],
-								MONOCHROMEOUTLINE = L["|cFFAAAAAAMono|r Outline"],
-								MONOCHROMETHICKOUTLINE = L["|cFFAAAAAAMono|r Thick"],
+							type = "group",
+							inline = true,
+							name = L["Value"],
+							get = function(info)
+								return E.private.WT.skins.details.bar.font.value[info[#info]]
+							end,
+							set = function(info, value)
+								E.private.WT.skins.details.bar.font.value[info[#info]] = value
+							end,
+							args = {
+								font = {
+									order = 1,
+									type = "select",
+									dialogControl = "LSM30_Font",
+									name = L["Font"],
+									values = LSM:HashTable("font"),
+								},
+								style = {
+									order = 2,
+									type = "select",
+									name = L["Outline"],
+									values = {
+										NONE = L["None"],
+										OUTLINE = L["Outline"],
+										THICKOUTLINE = L["Thick"],
+										SHADOW = L["|cff888888Shadow|r"],
+										SHADOWOUTLINE = L["|cff888888Shadow|r Outline"],
+										SHADOWTHICKOUTLINE = L["|cff888888Shadow|r Thick"],
+									},
+								},
+								size = {
+									order = 3,
+									name = L["Size"],
+									type = "range",
+									min = 5,
+									max = 60,
+									step = 1,
+								},
 							},
 						},
 					},
@@ -2317,14 +2246,6 @@ options.damageMeter = {
 		},
 	},
 }
-
-for key, value in pairs(options.blizzard.args) do
-	if key ~= "enable" then
-		value.disabled = function()
-			return not E.private.WT.skins.blizzard.enable
-		end
-	end
-end
 
 options.elvui = {
 	order = 6,

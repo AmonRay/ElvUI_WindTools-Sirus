@@ -691,7 +691,7 @@ end
             LIB_OPEN_RAID_COMM_SCHEDULER:Cancel();
         end
 
-        local newTickerHandle = C_Timer and C_Timer.NewTicker and C_Timer.NewTicker(0.05, function()
+        local newTickerHandle = C_Timer and C_Timer.NewTicker and C_Timer.NewTicker(C_Timer, 0.05, function()
             local serverTime = GetServerTime();
 
             -- Replenish the counter if last server time is not the same as the last throttle update
@@ -804,7 +804,9 @@ end
             end
         end
 
-        local result, errortext = xpcall(callback, geterrorhandler(), unpack(payload))
+        local result, errortext = xpcall(function()
+            return callback(unpack(payload))
+        end, geterrorhandler())
         --local result, errortext = pcall(callback, unpack(payload))
         if (not result) then
             sendChatMessage("openRaidLib: error on scheduler:", tickerObject.scheduleName, tickerObject.stack)
@@ -816,7 +818,7 @@ end
     --create a new schedule
     function openRaidLib.Schedules.NewTimer(time, callback, bCanRunWithoutGroup, ...)
         local payload = {...}
-        local newTimer = C_Timer and C_Timer.NewTimer and C_Timer.NewTimer(time, triggerScheduledTick)
+        local newTimer = C_Timer and C_Timer.NewTimer and C_Timer.NewTimer(C_Timer, time, triggerScheduledTick)
         if not newTimer then return end
         newTimer.bCanRunWithoutGroup = bCanRunWithoutGroup
         newTimer.payload = payload
@@ -1097,7 +1099,7 @@ end
 
         ["UNIT_SPELLCAST_SUCCEEDED"] = function(...)
             local unitId, castGUID, spellId = ...
-            C_Timer.After(0.1, function()
+            C_Timer:After(0.1, function()
                 --some spells has many different spellIds, get the default
                 spellId = LIB_OPEN_RAID_SPELL_DEFAULT_IDS[spellId] or spellId
                 --trigger internal callbacks
@@ -1330,7 +1332,7 @@ end
             openRaidLib.UnitInfoManager.AddUnitInfo(unitName, unpack(playerFullInfo)) --unpack: specId, talentsString, pvpTalentsTableUnpacked
 
         --gear info
-            --C_Timer.After(2, function()
+            --C_Timer:After(2, function()
                 local playerGearInfo = openRaidLib.GearManager.GetPlayerFullGearInfo()
                 openRaidLib.GearManager.AddUnitGearList(unitName, unpack(playerGearInfo))
             --end)
@@ -2307,7 +2309,7 @@ local cooldownStartTicker = function(spellId, cooldownTimeLeft)
     end
 
     --create a new ticker
-    local newTicker = C_Timer.NewTicker(tickInterval, cooldownTimeLeftCheck_Ticker, maxTicks)
+    local newTicker = C_Timer.NewTicker(C_Timer, tickInterval, cooldownTimeLeftCheck_Ticker, maxTicks)
 
     --store the ticker
     openRaidLib.CooldownManager.CooldownTickers[spellId] = newTicker
@@ -3044,7 +3046,7 @@ openRaidLib.commHandler.RegisterORComm(CONST_COMM_COOLDOWNREQUEST_PREFIX, openRa
         if (openRaidLib.KeystoneInfoManager.KeystoneChangedTimer) then
             return
         else
-            openRaidLib.KeystoneInfoManager.KeystoneChangedTimer = C_Timer.NewTimer(2, checkForKeystoneChange)
+            openRaidLib.KeystoneInfoManager.KeystoneChangedTimer = C_Timer.NewTimer(C_Timer, 2, checkForKeystoneChange)
         end
     end)
 
@@ -3221,7 +3223,7 @@ openRaidLib.commHandler.RegisterORComm(CONST_COMM_COOLDOWNREQUEST_PREFIX, openRa
 
         if (IsInGuild()) then
             local delay = math.random(0, 2) + math.random()
-            C_Timer.After(delay, openRaidLib.KeystoneInfoManager.SendPlayerKeystoneInfoToGuild)
+            C_Timer:After(delay, openRaidLib.KeystoneInfoManager.SendPlayerKeystoneInfoToGuild)
             --openRaidLib.Schedules.NewUniqueTimer(delay, openRaidLib.KeystoneInfoManager.SendPlayerKeystoneInfoToGuild, "KeystoneInfoManager", "sendKeystoneInfoToGuild_Schedule")
         end
     end
@@ -3294,7 +3296,7 @@ openRaidLib.commHandler.RegisterORComm(CONST_COMM_COOLDOWNREQUEST_PREFIX, openRa
         --attempt to load keystone item link as reports indicate it can be nil
         getMythicPlusMapID()
 
-        C_Timer.After(2, keystoneManagerOnPlayerEnterWorld)
+        C_Timer:After(2, keystoneManagerOnPlayerEnterWorld)
     end
 
     function openRaidLib.KeystoneInfoManager.OnMythicDungeonFinished()
@@ -3572,7 +3574,7 @@ openRaidLib.commHandler.RegisterORComm(CONST_COMM_COOLDOWNREQUEST_PREFIX, openRa
             return
         end
 
-        C_Timer.After(2, ratingManagerOnPlayerEnterWorld)
+        C_Timer:After(2, ratingManagerOnPlayerEnterWorld)
     end
 
     function openRaidLib.RatingInfoManager.OnMythicDungeonFinished()
@@ -3663,7 +3665,7 @@ local createLocalCooldownTracker = function()
 end
 
 --vintage cooldown tracker and interrupt tracker
-C_Timer.After(0.1, function()
+C_Timer:After(0.1, function()
     createLocalCooldownTracker()
 end)
 

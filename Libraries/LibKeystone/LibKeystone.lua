@@ -104,7 +104,13 @@ do
 end
 
 local SendAddonMessage = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
-local CTimerNewTimer = (C_Timer and C_Timer.NewTimer) or function() return nil end
+local CTimerNewTimer
+if C_Timer and type(C_Timer.NewTimer) == "function" then
+	local NewTimer = C_Timer.NewTimer
+	CTimerNewTimer = function(delay, callback, ...)
+		return NewTimer(C_Timer, delay, callback, ...)
+	end
+end
 local GetTime = GetTime
 local next, securecallfunction = next, securecallfunction
 local throttleTime = 3 -- Seconds
@@ -116,7 +122,13 @@ do
 	local timerTable = {}
 	local functionTable
 	local tonumber, match, format = tonumber, string.match, string.format
-	local Ambiguate = Ambiguate
+	-- Ambiguate is a retail helper absent on the 3.3.5a client; standard Wrath shim.
+	local Ambiguate = Ambiguate or function(name)
+		if type(name) ~= "string" then
+			return name
+		end
+		return (name:match("^([^%-]+)") or name)
+	end
 
 	do
 		local IsInGroup, IsInGuild = IsInGroup, IsInGuild

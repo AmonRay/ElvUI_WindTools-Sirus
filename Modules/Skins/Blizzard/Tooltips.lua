@@ -46,7 +46,7 @@ local function StyleTooltipWidgetContainer(tt)
 end
 
 function S:StyleIconsInTooltip(tt)
-	if tt:IsForbidden() or not tt.NumLines or not E.db.general.cropIcon then
+	if (not tt or (tt.IsForbidden and tt:IsForbidden())) or not tt.NumLines or not E.db.general.cropIcon then
 		return
 	end
 
@@ -124,7 +124,7 @@ function S:TooltipFrames()
 	}
 
 	for _, tt in pairs(tooltips) do
-		if tt and not tt.IsEmbedded and not tt:IsForbidden() then
+		if tt and not tt.IsEmbedded and not (tt.IsForbidden and tt:IsForbidden()) then
 			self:ReskinTooltip(tt)
 		end
 	end
@@ -135,9 +135,14 @@ function S:TooltipFrames()
 		end
 	end)
 
-	hooksecurefunc("GameTooltip_AddWidgetSet", StyleTooltipWidgetContainer)
+	-- game-tooltip widget sets are a retail tooltip plugin API absent on 3.3.5a
+	if _G.GameTooltip_AddWidgetSet then
+		hooksecurefunc("GameTooltip_AddWidgetSet", StyleTooltipWidgetContainer)
+	end
 
-	self:SecureHook(_G.QueueStatusFrame, "Update", "CreateShadow")
+	if _G.QueueStatusFrame and type(_G.QueueStatusFrame.Update) == "function" then
+		self:SecureHook(_G.QueueStatusFrame, "Update", "CreateShadow")
+	end
 	self:CreateBackdropShadow(_G.GameTooltipStatusBar)
 	self:SecureHook(TT, "GameTooltip_SetDefaultAnchor", function(_, tt)
 		if tt.StatusBar and tt.StatusBar.backdrop then

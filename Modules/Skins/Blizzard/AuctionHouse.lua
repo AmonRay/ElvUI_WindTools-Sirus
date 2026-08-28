@@ -4,13 +4,16 @@ local S = W.Modules.Skins ---@type Skins
 local _G = _G
 local pairs = pairs
 
-function S:Blizzard_AuctionHouseUI()
+function S:AuctionHouseFrame()
 	if not self:CheckDB("auctionhouse", "auctionHouse") then
 		return
 	end
 
+	if not _G.AuctionHouseFrame then
+		return
+	end
+
 	self:CreateShadow(_G.AuctionHouseFrame)
-	self:CreateShadow(_G.AuctionHouseFrame.WoWTokenResults.GameTimeTutorial)
 
 	local tabs = { _G.AuctionHouseFrameBuyTab, _G.AuctionHouseFrameSellTab, _G.AuctionHouseFrameAuctionsTab }
 	for _, tab in pairs(tabs) do
@@ -20,4 +23,6 @@ function S:Blizzard_AuctionHouseUI()
 	end
 end
 
-S:AddCallbackForAddon("Blizzard_AuctionHouseUI")
+-- The client ships a retail-style AuctionHouseFrame created from FrameXML
+-- (Custom_AuctionHouseUI), so it exists before addon load callbacks fire.
+S:AddCallback("AuctionHouseFrame")

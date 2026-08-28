@@ -113,21 +113,28 @@ function S:FriendsFrame()
 		return
 	end
 
-	_G.FriendsFrameBattlenetFrame.UnavailableInfoFrame:ClearAllPoints()
-	_G.FriendsFrameBattlenetFrame.UnavailableInfoFrame:Point("TOPLEFT", _G.FriendsFrame, "TOPRIGHT", 3, -1)
+	-- FriendsFrameBattlenetFrame plus Battle.net-only helpers (BNToastFrame,
+	-- QuickJoinRoleSelectionFrame) do not exist on 3.3.5a; guard each individually.
+	if _G.FriendsFrameBattlenetFrame then
+		_G.FriendsFrameBattlenetFrame.UnavailableInfoFrame:ClearAllPoints()
+		_G.FriendsFrameBattlenetFrame.UnavailableInfoFrame:Point("TOPLEFT", _G.FriendsFrame, "TOPRIGHT", 3, -1)
+	end
 
 	local frames = {
 		_G.FriendsFrame,
 		_G.FriendsFrame.IgnoreListWindow,
 		_G.FriendsFriendsFrame,
 		_G.AddFriendFrame,
-		_G.RecruitAFriendFrame.SplashFrame,
+		_G.RecruitAFriendFrame and _G.RecruitAFriendFrame.SplashFrame,
 		_G.RecruitAFriendRewardsFrame,
 		_G.RecruitAFriendRecruitmentFrame,
-		_G.FriendsFrameBattlenetFrame.UnavailableInfoFrame,
-		_G.FriendsFrameBattlenetFrame.BroadcastFrame,
-		_G.QuickJoinRoleSelectionFrame,
 	}
+
+	if _G.FriendsFrameBattlenetFrame then
+		frames[#frames + 1] = _G.FriendsFrameBattlenetFrame.UnavailableInfoFrame
+		frames[#frames + 1] = _G.FriendsFrameBattlenetFrame.BroadcastFrame
+	end
+	frames[#frames + 1] = _G.QuickJoinRoleSelectionFrame
 
 	for _, frame in pairs(frames) do
 		self:CreateShadow(frame)
@@ -153,7 +160,9 @@ function S:FriendsFrame()
 		end
 	end
 
-	self:SecureHook("FriendsFrame_UpdateFriendButton", ReskinFriendButton)
+	if _G.FriendsFrame_UpdateFriendButton then
+		self:SecureHook("FriendsFrame_UpdateFriendButton", ReskinFriendButton)
+	end
 
 	local RecentAlliesFrame = _G.RecentAlliesFrame
 	if RecentAlliesFrame and RecentAlliesFrame.List and RecentAlliesFrame.List.ScrollBox then
@@ -162,8 +171,10 @@ function S:FriendsFrame()
 		end)
 	end
 
-	self:SecureHook(_G.RecruitAFriendRewardsFrame, "UpdateRewards", UpdateRewards)
-	UpdateRewards()
+	if _G.RecruitAFriendRewardsFrame and _G.RecruitAFriendRewardsFrame.UpdateRewards then
+		self:SecureHook(_G.RecruitAFriendRewardsFrame, "UpdateRewards", UpdateRewards)
+		UpdateRewards()
+	end
 end
 
 S:AddCallback("FriendsFrame")

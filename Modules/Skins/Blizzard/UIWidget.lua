@@ -122,6 +122,11 @@ function S:BlizzardUIWidget()
 		return
 	end
 
+	-- The whole UI widget system is Dragonflight+-only and absent on 3.3.5a.
+	if not _G.UIWidgetBaseStatusBarTemplateMixin then
+		return
+	end
+
 	-- Partitions
 	self:SecureHook(_G.UIWidgetBaseStatusBarTemplateMixin, "InitPartitions", "ReskinWidgetPartition")
 	self:SecureHook(_G.UIWidgetTemplateUnitPowerBarMixin, "InitPartitions", "ReskinWidgetPartition")

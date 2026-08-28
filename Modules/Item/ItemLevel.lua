@@ -13,8 +13,12 @@ local Item = Item
 local ItemLocation = ItemLocation
 
 local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
-local C_Item_DoesItemExist = (_G.C_Item and _G.C_Item.DoesItemExist) or function(location)
-	return location and location.GetBagAndSlot and location:GetBagAndSlot() ~= nil
+local C_Item_DoesItemExist = (_G.C_Item and _G.C_Item.DoesItemExist)
+local function DoesItemExist(location)
+	if C_Item_DoesItemExist then return DoesItemExist(location) end
+	if not location or not location.GetBagAndSlot then return false end
+	local bag, slot = location:GetBagAndSlot()
+	return bag ~= nil and slot ~= nil and GetContainerItemLink and GetContainerItemLink(bag, slot) ~= nil
 end
 
 local EQUIPMENTFLYOUT_FIRST_SPECIAL_LOCATION = EQUIPMENTFLYOUT_FIRST_SPECIAL_LOCATION
@@ -45,7 +49,7 @@ local function RefreshItemLevel(text, db, location)
 
 	local isValidLocation = location:GetBagAndSlot() or location:GetEquipmentSlot()
 
-	if not isValidLocation or not C_Item_DoesItemExist(location) then
+	if not isValidLocation or not DoesItemExist(location) then
 		text:SetText("")
 		return
 	end

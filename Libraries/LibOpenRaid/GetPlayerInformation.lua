@@ -27,8 +27,8 @@ local CONST_ISITEM_BY_TYPEID = {
     [12] = true, --utility items
 }
 
-local GetSpecialization = C_SpecializationInfo and C_SpecializationInfo.GetSpecialization or GetSpecialization
-local GetSpecializationInfo = C_SpecializationInfo and C_SpecializationInfo.GetSpecializationInfo or GetSpecializationInfo
+local GetSpecialization = C_SpecializationInfo and C_SpecializationInfo.GetSpecialization or GetSpecialization or function() return nil end
+local GetSpecializationInfo = C_SpecializationInfo and C_SpecializationInfo.GetSpecializationInfo or GetSpecializationInfo or function() return nil end
 
 local GetInventoryItemLink = GetInventoryItemLink
 
@@ -45,7 +45,7 @@ local GetSpellInfo = GetSpellInfo or function(spellID)
     end
 end
 local GetSpellCooldown = C_Spell and C_Spell.GetSpellCooldown or GetSpellCooldown
-local GetDetailedItemLevelInfo = C_Item and C_Item.GetDetailedItemLevelInfo or GetDetailedItemLevelInfo
+local GetDetailedItemLevelInfo = C_Item and C_Item.GetDetailedItemLevelInfo or GetDetailedItemLevelInfo or function() return nil end
 local GetSpellTabInfo = GetSpellTabInfo or (function(tabLine)
     if not tabLine then return nil end
 

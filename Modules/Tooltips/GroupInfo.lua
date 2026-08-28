@@ -138,4 +138,11 @@ function T:GroupInfo()
 	self:SecureHook("LFGListUtil_SetSearchEntryTooltip", "AddGroupInfo")
 end
 
-T:AddCallback("GroupInfo")
+if T.AddCallback then
+	T:AddCallback("GroupInfo")
+elseif not T.__windtoolsCoreMissingWarned then
+	T.__windtoolsCoreMissingWarned = true
+	F.Developer.ThrowError(
+		"Tooltips GroupInfo was skipped: Modules/Tooltips/Core.lua did not load (T:AddCallback is missing), so tooltip callbacks were not registered. Reinstall ElvUI_WindTools with a complete copy of all files, then /reload."
+	)
+end

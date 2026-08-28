@@ -159,7 +159,7 @@ function SB:CreateBar()
 	frame:SetFrameStrata("LOW")
 	frame:SetFrameLevel(5)
 	frame:CreateBackdrop("Transparent")
-	RegisterStateDriver(frame, "visibility", "[petbattle] hide; show")
+	RegisterStateDriver(frame, "visibility", "show")
 
 	self.bar = frame
 

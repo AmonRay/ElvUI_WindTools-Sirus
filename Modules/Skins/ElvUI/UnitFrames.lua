@@ -30,16 +30,14 @@ function S:ElvUI_UnitFrames_Configure_Threat(_, f)
 			return
 		end
 		if parent.db and parent.db.threatStyle == "GLOW" then
-			if parent.Health and parent.Health.backdrop and parent.Health.backdrop.shadow then
-				parent.Health.backdrop.shadow:SetShown(not threat.MainGlow:IsShown())
+			if parent.Health and parent.Health.backdrop and parent.Health.backdrop.shadow then					parent.Health.backdrop.shadow:SetShown(not (threat.MainGlow and threat.MainGlow:IsShown()))
 			end
 			if
 				parent.Power
 				and parent.Power.backdrop
 				and parent.Power.backdrop.shadow
 				and parent.USE_POWERBAR_OFFSET
-			then
-				parent.Power.backdrop.shadow:SetShown(not threat.MainGlow:IsShown())
+			then						parent.Power.backdrop.shadow:SetShown(not (threat.MainGlow and threat.MainGlow:IsShown()))
 			end
 		end
 	end

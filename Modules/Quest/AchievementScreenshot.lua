@@ -81,7 +81,9 @@ function AS:Initialize()
 	end
 
 	self:RegisterEvent("ACHIEVEMENT_EARNED", "DelayScreenshot")
-	self:SecureHook(_G.AchievementAlertSystem:GetAlertContainer(), "AddAlertFrame")
+	if _G.AchievementAlertSystem and _G.AchievementAlertSystem.GetAlertContainer then
+		self:SecureHook(_G.AchievementAlertSystem:GetAlertContainer(), "AddAlertFrame")
+	end
 
 	self.initialized = true
 end

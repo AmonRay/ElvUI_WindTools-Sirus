@@ -33,21 +33,26 @@ function S:MerchantFrame()
 		self:HandleMerchantItem(i)
 	end
 
-	for _, region in pairs({ _G.MerchantMoneyFrame.GoldButton:GetRegions() }) do
-		if region:GetObjectType() == "Texture" then
-			F.Move(region, 0, 4)
+	local goldButton = _G.MerchantMoneyFrame and _G.MerchantMoneyFrame.GoldButton
+	if goldButton and goldButton.GetRegions then
+		for _, region in pairs({ goldButton:GetRegions() }) do
+			if region:GetObjectType() == "Texture" then
+				F.Move(region, 0, 4)
+			end
 		end
 	end
 
-	hooksecurefunc("MerchantFrame_UpdateCurrencies", function()
-		for i = 1, 3 do
-			local token = _G["MerchantToken" .. i] --[[@as BackpackTokenTemplate?]]
-			if token and not token.__wind then
-				token:Width(token:GetWidth() + 2)
-				F.SetFont(token.Count)
-				F.Move(token.Count, -2, 0)
-				token.Icon:SetTexCoords()
-				token.__wind = true
+	-- Refresh alternate currency icons whenever the merchant list is updated.
+	-- In Wrath this is handled by MerchantFrame_UpdateAltCurrency.
+	hooksecurefunc("MerchantFrame_UpdateAltCurrency", function(index, itemIndex)
+		for currencyIndex = 1, 3 do
+			local itemLine = _G["MerchantItem" .. itemIndex .. "AltCurrencyFrameItem" .. currencyIndex]
+			if itemLine then
+				for _, region in pairs({ itemLine:GetRegions() }) do
+					if region:GetObjectType() == "Texture" then
+						region:SetTexCoords()
+					end
+				end
 			end
 		end
 	end)

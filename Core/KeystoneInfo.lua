@@ -6,11 +6,19 @@ local KI = W:NewModule("KeystoneInfo", "AceEvent-3.0") ---@class KeystoneInfo : 
 local OR = E.Libs.OpenRaid
 local KS = E.Libs.Keystone
 
+-- Both libraries are optional on Wrath. Keep this module inert when they are
+-- unavailable instead of failing while Core files are evaluated.
+
 local select = select
 local strsplit = strsplit
 local tonumber = tonumber
 
-local Ambiguate = Ambiguate
+local Ambiguate = Ambiguate or function(name)
+	if type(name) ~= "string" then
+		return name
+	end
+	return (name:match("^([^%-]+)") or name)
+end
 local GetInstanceInfo = GetInstanceInfo
 local GetUnitName = GetUnitName
 local IsInGroup = IsInGroup
@@ -121,6 +129,16 @@ function KI.RequestData()
 		end
 		OR.RequestKeystoneDataFromParty()
 	end
+end
+
+if not KS then
+	function KI:OnEnable() end
+	return
+end
+
+if not KS or type(KS.Register) ~= "function" then
+	function KI:OnEnable() end
+	return
 end
 
 KS.Register(KI, function(keyLevel, keyChallengeMapID, playerRating, sender)

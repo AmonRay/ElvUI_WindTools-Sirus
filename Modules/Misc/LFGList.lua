@@ -58,9 +58,11 @@ local C_MythicPlus = C_MythicPlus or {}
 local C_MythicPlus_GetCurrentAffixes = C_MythicPlus and C_MythicPlus.GetCurrentAffixes or function() return {} end
 local C_MythicPlus_GetRewardLevelForDifficultyLevel = C_MythicPlus and C_MythicPlus.GetRewardLevelForDifficultyLevel or function() return nil end
 local C_MythicPlus_GetRunHistory = C_MythicPlus and C_MythicPlus.GetRunHistory or function() return {} end
-local C_SpecializationInfo_GetSpecialization = C_SpecializationInfo and C_SpecializationInfo.GetSpecialization or GetSpecialization or function() return nil end
-local C_SpecializationInfo_GetSpecializationInfo = C_SpecializationInfo and C_SpecializationInfo.GetSpecializationInfo or GetSpecializationInfo or function() return nil end
-local Enum_LFGListFilter = _G.Enum and _G.Enum.LFGListFilter or { CurrentSeason = 0, PvE = 0, CurrentExpansion = 0, NotCurrentSeason = 0 }
+local Enum_LFGListFilter = _G.Enum and _G.Enum.LFGListFilter or {}
+local LFG_FILTER_CURRENT_SEASON = Enum_LFGListFilter.CurrentSeason or 0
+local LFG_FILTER_PVE = Enum_LFGListFilter.PvE or 0
+local LFG_FILTER_CURRENT_EXPANSION = Enum_LFGListFilter.CurrentExpansion or 0
+local LFG_FILTER_NOT_CURRENT_SEASON = Enum_LFGListFilter.NotCurrentSeason or 0
 
 local GROUP_FINDER_CATEGORY_ID_DUNGEONS = GROUP_FINDER_CATEGORY_ID_DUNGEONS
 local GROUP_FINDER_CUSTOM_CATEGORY = GROUP_FINDER_CUSTOM_CATEGORY
@@ -79,11 +81,11 @@ local QUICK_ACCESS_PANEL_WIDTH = 2 * FILTER_BUTTON_WIDTH + FILTER_BUTTON_SPACING
 
 local seasonGroups = C_LFGList_GetAvailableActivityGroups(
 	GROUP_FINDER_CATEGORY_ID_DUNGEONS,
-	bit.bor(Enum_LFGListFilter.CurrentSeason, Enum_LFGListFilter.PvE)
+	bit.bor(LFG_FILTER_CURRENT_SEASON, LFG_FILTER_PVE)
 )
 local expansionGroups = C_LFGList_GetAvailableActivityGroups(
 	GROUP_FINDER_CATEGORY_ID_DUNGEONS,
-	bit.bor(Enum_LFGListFilter.CurrentExpansion, Enum_LFGListFilter.NotCurrentSeason, Enum_LFGListFilter.PvE)
+	bit.bor(LFG_FILTER_CURRENT_EXPANSION, LFG_FILTER_NOT_CURRENT_SEASON, LFG_FILTER_PVE)
 )
 
 local vaultItemLevel = {}
@@ -1525,8 +1527,8 @@ function LL:GetPartyRoles()
 			end
 		end
 	else
-		local specIndex = C_SpecializationInfo_GetSpecialization()
-		local role = specIndex and select(5, C_SpecializationInfo_GetSpecializationInfo(specIndex))
+		local specIndex = W.Compatibility.GetSpecialization()
+		local role = specIndex and select(5, W.Compatibility.GetSpecializationInfo(specIndex))
 		if partyMember[role] then
 			partyMember[role] = partyMember[role] + 1
 		end
@@ -1681,6 +1683,13 @@ function LL:GROUP_ROSTER_UPDATE(...)
 end
 
 function LL:Initialize()
+	-- LFGList (Premade Groups) plus mythic+ keystones are Legion+ systems. The
+	-- 3.3.5a client ships no C_MythicPlus (the API every method below depends on),
+	-- so skip the module silently regardless of whether a LFGListFrame exists.
+	if not C_MythicPlus or not C_MythicPlus.RequestCurrentAffixes then
+		return
+	end
+
 	if C_AddOns_IsAddOnLoaded("PremadeGroupsFilter") then
 		self.StopRunning = L["Premade Groups Filter"]
 		return

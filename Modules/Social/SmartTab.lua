@@ -1,5 +1,5 @@
 local W, F, E, L = unpack((select(2, ...))) ---@type WindTools, Functions, ElvUI, LocaleTable
-local CB = W:GetModule("ChatBar") ---@class ChatBar
+local CB = W:GetModule("ChatBar", true) ---@class ChatBar
 local ST = W:NewModule("SmartTab", "AceHook-3.0", "AceEvent-3.0")
 
 local _G = _G
@@ -12,7 +12,14 @@ local tostring = tostring
 local unpack = unpack
 local wipe = wipe
 
-local Ambiguate = Ambiguate
+-- Ambiguate is a retail helper absent on the 3.3.5a client; the standard Wrath
+-- shim strips the realm suffix (the part after '-').
+local Ambiguate = Ambiguate or function(name)
+	if type(name) ~= "string" then
+		return name
+	end
+	return (name:match("^([^%-]+)") or name)
+end
 local CopyTable = CopyTable
 local IsEveryoneAssistant = IsEveryoneAssistant
 local IsInGroup = IsInGroup
@@ -22,7 +29,7 @@ local UnitInBattleground = UnitInBattleground
 local UnitIsGroupAssistant = UnitIsGroupAssistant
 local UnitIsGroupLeader = UnitIsGroupLeader
 
-local C_GuildInfo_IsGuildOfficer = C_GuildInfo and C_GuildInfo.IsGuildOfficer or function() return false end
+local C_GuildInfo_IsGuildOfficer = C_GuildInfo and C_GuildInfo.IsGuildOfficer or CanEditOfficerNote
 
 local LE_PARTY_CATEGORY_HOME = LE_PARTY_CATEGORY_HOME
 local LE_PARTY_CATEGORY_INSTANCE = LE_PARTY_CATEGORY_INSTANCE
@@ -291,12 +298,17 @@ function ST:Initialize()
 	self.db = E.db.WT.social.smartTab
 	self.private = E.private.WT.social.smartTab
 
-	self:SecureHook("ChatEdit_CustomTabPressed", "TabPressed")
+	-- ChatEdit_CustomTabPressed is a retail global; on 3.3.5a it does not exist.
+	if _G.ChatEdit_CustomTabPressed then
+		self:SecureHook("ChatEdit_CustomTabPressed", "TabPressed")
+	end
 
-	for _, frameName in ipairs(_G.CHAT_FRAMES) do
-		local chat = _G[frameName]
-		if chat and chat.editBox then
-			self:SecureHook(chat.editBox, "SecureTabPressed", "SecureTabPressed")
+	if type(_G.CHAT_FRAMES) == "table" then
+		for _, frameName in ipairs(_G.CHAT_FRAMES) do
+			local chat = _G[frameName]
+			if chat and chat.editBox and chat.editBox.SecureTabPressed then
+				self:SecureHook(chat.editBox, "SecureTabPressed", "SecureTabPressed")
+			end
 		end
 	end
 

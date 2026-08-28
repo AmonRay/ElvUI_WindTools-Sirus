@@ -20,8 +20,8 @@ local CreateFrame = CreateFrame
 local EventRegistry = EventRegistry
 local GetServerTime = GetServerTime
 
-local C_QuestLog_IsQuestFlaggedCompleted = C_QuestLog and C_QuestLog.IsQuestFlaggedCompleted or function() return false end
-local C_Timer_NewTicker = W.Compatibility.HasTimerAPI and C_Timer.NewTicker or function() return nil end
+local C_QuestLog_IsQuestFlaggedCompleted = W.Compatibility.IsQuestFlaggedCompleted or function() return false end
+local C_Timer_NewTicker = W.Compatibility.NewTicker
 
 local LeftButtonIcon = "|TInterface\\TUTORIALFRAME\\UI-TUTORIAL-FRAME:13:11:0:-1:512:512:12:66:230:307|t"
 
@@ -571,12 +571,14 @@ function Trackers:Acquire(event)
 				end
 			end
 
-			frame.tickerInstance = C_Timer_NewTicker(functions.ticker.interval, function()
+				if C_Timer_NewTicker then
+				frame.tickerInstance = C_Timer_NewTicker(functions.ticker.interval, function()
 				if not (ET and ET.db and ET.db.enable) then
 					return
 				end
 				frame.tickFunc()
-			end)
+				end)
+			end
 			if not frame.tickerInstance then
 				frame.tickFunc()
 			end
@@ -701,7 +703,7 @@ function ET:UpdateTrackers()
 
 		if self.db.style.backdrop then
 			if not self.frame.backdrop then
-				self.frame.backdrop = CreateFrame("Frame", nil, self.frame, "TooltipBackdropTemplate")
+				self.frame.backdrop = CreateFrame("Frame", nil, self.frame)
 				self.frame.backdrop:SetAllPoints(self.frame)
 			end
 			self.frame.backdrop:Show()
@@ -803,8 +805,13 @@ function ET:Initialize()
 	EventRegistry:RegisterCallback("WorldMapOnShow", self.UpdateTrackers, self)
 	EventRegistry:RegisterCallback("WorldMapMinimized", E.Delay, E, 0.1, self.UpdateTrackers, self)
 	EventRegistry:RegisterCallback("WorldMapMaximized", E.Delay, E, 0.1, self.UpdateTrackers, self)
-	self:SecureHook(_G.QuestMapFrame, "Show", "UpdateTrackers")
-	self:SecureHook(_G.QuestMapFrame, "Hide", "UpdateTrackers")
+	-- QuestMapFrame is a retail-only frame; on 3.3.5a the map is WorldMapFrame.
+	-- Only hook it when it actually exists (the module is also gated on modern
+	-- map API, but guard against a partial backport target).
+	if _G.QuestMapFrame then
+		self:SecureHook(_G.QuestMapFrame, "Show", "UpdateTrackers")
+		self:SecureHook(_G.QuestMapFrame, "Hide", "UpdateTrackers")
+	end
 
 	self.initialized = true
 end

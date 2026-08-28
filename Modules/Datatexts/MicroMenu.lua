@@ -11,10 +11,15 @@ local IsInGuild = IsInGuild
 local ToggleFrame = ToggleFrame
 local UIErrorsFrame = UIErrorsFrame
 
-local MenuUtil_CreateContextMenu = MenuUtil.CreateContextMenu
+local MenuUtil = _G.MenuUtil
+local MenuUtil_CreateContextMenu = MenuUtil and MenuUtil.CreateContextMenu
 
-local dropdown =
-	CreateFrame("DropdownButton", "WTMicroMenuDatatextMenuDropDown", E.UIParent, "WowStyle1DropdownTemplate")
+-- DropdownButton and MenuUtil are retail-only. The datatext still loads on
+-- Wrath, but its modern context-menu implementation is disabled there.
+local dropdown
+if MenuUtil_CreateContextMenu and CreateFrame and type(_G.DropdownButtonMixin) == "table" then
+	dropdown = CreateFrame("Button", "WTMicroMenuDatatextMenuDropDown", E.UIParent, "WowStyle1DropdownTemplate")
+end
 
 local function GenerateDayContextMenu(owner, rootDescription)
 	rootDescription:SetTag("WT_MICRO_MENU")
@@ -94,7 +99,9 @@ local function OnClick(self, button)
 	end
 
 	if button == "LeftButton" then
-		MenuUtil_CreateContextMenu(self, GenerateDayContextMenu)
+		if MenuUtil_CreateContextMenu then
+			MenuUtil_CreateContextMenu(self, GenerateDayContextMenu)
+		end
 	elseif button == "RightButton" then
 		ToggleFrame(_G.GameMenuFrame)
 	end

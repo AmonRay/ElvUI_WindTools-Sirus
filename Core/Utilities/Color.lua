@@ -683,13 +683,13 @@ function W.Utilities.Color.StringWithClassColor(text, classFile)
 
 	if not classFile or type(classFile) ~= "string" then
 		F.Developer.LogDebug("Color.StringWithClassColor: class not found")
-		return
+		return text
 	end
 
 	local color = E:ClassColor(classFile, true)
 	if not color then
 		F.Developer.LogDebug("Color.StringWithClassColor: invalid class " .. tostring(classFile))
-		return
+		return text
 	end
 
 	return W.Utilities.Color.StringWithRGB(text, color.r, color.g, color.b)

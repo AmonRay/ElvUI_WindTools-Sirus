@@ -133,13 +133,17 @@ function S:ElvUI_ActionBars()
 		return
 	end
 
-	-- Extra action bar
-	self:SecureHook(_G.ZoneAbilityFrame, "UpdateDisplayedZoneAbilities", "SkinZoneAbilities")
+	-- Extra action bar (ZoneAbilityFrame does not exist on this client)
+	if _G.ZoneAbilityFrame and _G.ZoneAbilityFrame.UpdateDisplayedZoneAbilities then
+		self:SecureHook(_G.ZoneAbilityFrame, "UpdateDisplayedZoneAbilities", "SkinZoneAbilities")
+	end
 
-	for i = 1, _G.ExtraActionBarFrame:GetNumChildren() do
-		local button = _G["ExtraActionButton" .. i]
-		if button then
-			self:CreateShadow(button)
+	if _G.ExtraActionBarFrame and _G.ExtraActionBarFrame.GetNumChildren then
+		for i = 1, _G.ExtraActionBarFrame:GetNumChildren() do
+			local button = _G["ExtraActionButton" .. i]
+			if button then
+				self:CreateShadow(button)
+			end
 		end
 	end
 
@@ -178,16 +182,22 @@ function S:ElvUI_ActionBars()
 		end
 	end
 
-	-- Extra action bar
-	for i = 1, _G.ExtraActionBarFrame:GetNumChildren() do
-		local button = _G["ExtraActionButton" .. i]
-		self:CreateBackdropShadow(button.backdrop, true)
+	-- Extra action bar (ExtraActionButton globals do not exist on 3.3.5a)
+	if _G.ExtraActionBarFrame and _G.ExtraActionBarFrame.GetNumChildren then
+		for i = 1, _G.ExtraActionBarFrame:GetNumChildren() do
+			local button = _G["ExtraActionButton" .. i]
+			if button and button.backdrop then
+				self:CreateBackdropShadow(button.backdrop, true)
+			end
+		end
 	end
 
-	-- Flyout
-	self:SecureHook(AB, "SetupFlyoutButton", function(_, button)
-		self:CreateShadow(button)
-	end)
+	-- Flyout (SetupFlyoutButton is retail-only on this ElvUI fork)
+	if AB.SetupFlyoutButton then
+		self:SecureHook(AB, "SetupFlyoutButton", function(_, button)
+			self:CreateShadow(button)
+		end)
+	end
 
 	-- Keybind
 	self:ElvUI_ActionBar_LoadKeyBinder()

@@ -437,7 +437,7 @@ function MB:SkinButton(button, force)
 							for i = 1, numMaskTextures do
 								region:RemoveMaskTexture(region:GetMaskTexture(i))
 							end
-						else
+						elseif region.SetMask then
 							region:SetMask("")
 						end
 					elseif region.SetMask then
@@ -817,7 +817,7 @@ function MB:UpdateLayout()
 
 		self.bar:Size(width, height)
 		self.barAnchor:Size(width, height)
-		RegisterStateDriver(self.bar, "visibility", "[petbattle]hide;show")
+		RegisterStateDriver(self.bar, "visibility", "show")
 		self.bar:Show()
 	else
 		UnregisterStateDriver(self.bar, "visibility")
@@ -877,12 +877,12 @@ function MB:CreateFrames()
 		return
 	end
 
-	local frame = CreateFrame("Frame", nil, E.UIParent, "BackdropTemplate")
+	local frame = CreateFrame("Frame", nil, E.UIParent)
 	frame:Point("TOPRIGHT", EM.MapHolder, "BOTTOMRIGHT", 0, -5)
 	frame:SetFrameStrata("BACKGROUND")
 	self.barAnchor = frame
 
-	frame = CreateFrame("Frame", nil, E.UIParent, "BackdropTemplate")
+	frame = CreateFrame("Frame", nil, E.UIParent)
 	frame:SetFrameStrata("LOW")
 	frame:CreateBackdrop("Transparent")
 	frame:ClearAllPoints()
@@ -954,5 +954,9 @@ function MB:Initialize()
 	end)
 end
 
-MB:RawHook(EM, "HandleExpansionButton")
-W:RegisterModule(MB:GetName())
+if EM and type(EM.HandleExpansionButton) == "function" then
+	MB:RawHook(EM, "HandleExpansionButton")
+end
+if W and type(W.RegisterModule) == "function" then
+	W:RegisterModule(MB:GetName())
+end

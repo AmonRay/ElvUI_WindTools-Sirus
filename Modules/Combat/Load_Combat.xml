@@ -3,5 +3,4 @@
 	<Script file='DestroyTotem.lua'/>
 	<Script file='QuickKeystone.lua'/>
 	<Script file='RaidMarkers.lua'/>
-	<Script file='DamageMeterLayout.lua'/>
 </Ui>

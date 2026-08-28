@@ -10,6 +10,12 @@ function S:Blizzard_DebugTools()
 		return
 	end
 
+	-- TableAttributeDisplay / TableInspectorMixin are retail Mixin-only DebugTools
+	-- frames that do not exist on 3.3.5a; skip the whole skin gracefully.
+	if not _G.TableAttributeDisplay or not _G.TableInspectorMixin then
+		return
+	end
+
 	self:CreateShadow(_G.TableAttributeDisplay)
 	self:SecureHook(_G.TableInspectorMixin, "OnLoad", "CreateBackdropShadow")
 

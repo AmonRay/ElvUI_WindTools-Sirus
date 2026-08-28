@@ -11,7 +11,7 @@ local wipe = wipe
 local Mixin = Mixin
 
 local C_Timer = _G.C_Timer
-local C_Timer_NewTicker = W.Compatibility.HasTimerAPI and C_Timer.NewTicker
+local C_Timer_NewTicker = W.Compatibility.NewTicker
 
 ---@class CacheConfig Configuration for cache instance
 ---@field defaultTTL number Default time-to-live in seconds (0 = no expiration)
@@ -143,6 +143,7 @@ local function startAutoCleanup(self)
 			cleanup(self)
 		end)
 	end
+end
 
 ---Stop automatic cleanup timer
 ---@param self Cache

@@ -19,7 +19,14 @@ local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
 local C_MapExplorationInfo_GetExploredMapTextures = C_MapExplorationInfo and C_MapExplorationInfo.GetExploredMapTextures or function() return nil end
 local C_Map_GetMapArtID = C_Map and C_Map.GetMapArtID or function() return nil end
 local C_Map_GetMapArtLayers = C_Map and C_Map.GetMapArtLayers or function() return nil end
-local C_Map_GetMapInfo = C_Map and C_Map.GetMapInfo or function() return nil end
+local C_Map_GetMapInfo = C_Map and C_Map.GetMapInfo
+local function GetMapInfoCompat(mapID)
+	if C_Map_GetMapInfo then return GetMapInfoCompat(mapID) end
+	if GetMapInfo then
+		local name = select(1, GetMapInfo(mapID))
+		return mapID and { mapID = mapID, name = name or tostring(mapID), mapType = 0 }
+	end
+end
 
 -- STRUCTURE:
 -- UiMapArtID = {
@@ -2882,7 +2889,8 @@ function WM:MapExplorationPin_RefreshOverlays(pin, fullUpdate, cache)
 	local TILE_SIZE_HEIGHT = layerInfo.tileHeight
 
 	-- Get the map type (needed to make sure only zone maps are tinted)
-	local mapType = C_Map_GetMapInfo(mapID).mapType or 0
+	local mapInfo = GetMapInfoCompat(mapID)
+	local mapType = mapInfo and mapInfo.mapType or 0
 
 	for key, files in pairs(db) do
 		local textureWidthStr, textureHeightStr, offsetXStr, offsetYStr = strsplit(":", key)
@@ -2977,14 +2985,18 @@ function WM:Reveal()
 		RevealDatabase[542]["267:257:336:327"] = gsub(RevealDatabase[542]["267:257:336:327"], "1003342", "")
 	end
 
-	for pin in _G.WorldMapFrame:EnumeratePinsByTemplate("MapExplorationPinTemplate") do
-		hooksecurefunc(pin, "RefreshOverlays", function(_pin, fullUpdate)
-			WM:MapExplorationPin_RefreshOverlays(_pin, fullUpdate, worldMapCache)
-		end)
-		hooksecurefunc(pin, "OnReleased", function(_pin)
-			pin.isWaitingForLoad = nil
-		end)
-		pin.overlayTexturePool.resetterFunc = overlayTexturePoolResetter
+	-- EnumeratePinsByTemplate / MapExplorationPinTemplate are retail-only; the
+	-- 3.3.5a world map (Wrath) has no exploration fog pins, so skip gracefully.
+	if _G.WorldMapFrame.EnumeratePinsByTemplate then
+		for pin in _G.WorldMapFrame:EnumeratePinsByTemplate("MapExplorationPinTemplate") do
+			hooksecurefunc(pin, "RefreshOverlays", function(_pin, fullUpdate)
+				WM:MapExplorationPin_RefreshOverlays(_pin, fullUpdate, worldMapCache)
+			end)
+			hooksecurefunc(pin, "OnReleased", function(_pin)
+				pin.isWaitingForLoad = nil
+			end)
+			pin.overlayTexturePool.resetterFunc = overlayTexturePoolResetter
+		end
 	end
 
 	if C_AddOns_IsAddOnLoaded("Blizzard_BattlefieldMap") then
@@ -2995,6 +3007,11 @@ function WM:Reveal()
 end
 
 function WM:RevealBattleFieldMap()
+	-- BattlefieldMapFrame is retail-only (Cata+ BG map) absent on 3.3.5a.
+	if not _G.BattlefieldMapFrame or not _G.BattlefieldMapFrame.EnumeratePinsByTemplate then
+		return
+	end
+
 	for pin in _G.BattlefieldMapFrame:EnumeratePinsByTemplate("MapExplorationPinTemplate") do
 		hooksecurefunc(pin, "RefreshOverlays", function(_pin, fullUpdate)
 			WM:MapExplorationPin_RefreshOverlays(_pin, fullUpdate, battleFieldMapCache)

@@ -16,7 +16,7 @@ function T:ChangeHealthBarPosition(_, tt)
 		return
 	end
 
-	if tt:IsForbidden() or not ET.db.visibility then
+	if (not tt or (tt.IsForbidden and tt:IsForbidden())) or not ET.db.visibility then
 		return
 	end
 
@@ -45,4 +45,11 @@ function T:HealthBar()
 	T:SecureHook(ET, "GameTooltip_SetDefaultAnchor", "ChangeHealthBarPosition")
 end
 
-T:AddCallback("HealthBar")
+if T.AddCallback then
+	T:AddCallback("HealthBar")
+elseif not T.__windtoolsCoreMissingWarned then
+	T.__windtoolsCoreMissingWarned = true
+	F.Developer.ThrowError(
+		"Tooltips HealthBar was skipped: Modules/Tooltips/Core.lua did not load (T:AddCallback is missing), so tooltip callbacks were not registered. Reinstall ElvUI_WindTools with a complete copy of all files, then /reload."
+	)
+end

@@ -38,4 +38,11 @@ function T:AddKeystone(tt, unit)
 	tt:AddDoubleLine(L["Keystone"], right)
 end
 
-T:AddInspectInfoCallback(1, "AddKeystone", false)
+if T.AddInspectInfoCallback then
+	T:AddInspectInfoCallback(1, "AddKeystone", false)
+elseif not T.__windtoolsCoreMissingWarned then
+	T.__windtoolsCoreMissingWarned = true
+	F.Developer.ThrowError(
+		"Tooltips Keystone was skipped: Modules/Tooltips/Core.lua did not load (T:AddInspectInfoCallback is missing), so tooltip callbacks were not registered. Reinstall ElvUI_WindTools with a complete copy of all files, then /reload."
+	)
+end

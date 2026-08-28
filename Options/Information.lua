@@ -194,7 +194,7 @@ options.help = {
 					name = format(
 						"%s | %s",
 						"fang2hou",
-						C.StringWithClassColor("Tabimonk @ " .. L["Shadowmoon"] .. "(TW)", "MONK")
+						C.StringWithClassColor("Tabimonk @ " .. (L["Shadowmoon"] or "Shadowmoon") .. " (TW)", "MONK")
 					),
 				},
 				["DakJaniels"] = {
@@ -208,7 +208,7 @@ options.help = {
 					name = format(
 						"%s: %s",
 						"mcc1",
-						C.StringWithClassColor("青楓殘月 @ " .. L["Lights Hope"] .. " (TW)", "MAGE")
+						C.StringWithClassColor("青楓殘月 @ " .. (L["Lights Hope"] or "Lights Hope") .. " (TW)", "MAGE")
 					),
 				},
 				["someblu"] = {
@@ -223,7 +223,7 @@ options.help = {
 						"%s: %s | %s",
 						"keludechu",
 						E.InfoColor .. "水稻" .. "|r",
-						C.StringWithClassColor("Surtr @ " .. L["Blanchard"] .. " (CN)", "WARLOCK")
+						C.StringWithClassColor("Surtr @ " .. (L["Blanchard"] or "Blanchard") .. " (CN)", "WARLOCK")
 					),
 				},
 				["LiangYuxuan"] = {
@@ -238,7 +238,7 @@ options.help = {
 						"%s: %s | %s",
 						"asdf12303116",
 						E.InfoColor .. "Chen" .. "|r",
-						C.StringWithClassColor("一发径直入魂 @ " .. L["Burning Blade"] .. " (CN)", "HUNTER")
+						C.StringWithClassColor("一发径直入魂 @ " .. (L["Burning Blade"] or "Burning Blade") .. " (CN)", "HUNTER")
 					),
 				},
 				["KurtzPT"] = {

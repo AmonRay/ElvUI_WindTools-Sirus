@@ -27,9 +27,10 @@ local LE_PARTY_CATEGORY_INSTANCE = LE_PARTY_CATEGORY_INSTANCE
 A.history = {}
 
 function A:CanSentMessage()
-	return not C_RestrictedActions_IsAddOnRestrictionActive
-		or not Enum_AddOnRestrictionType_ChallengeMode
-		or not C_RestrictedActions_IsAddOnRestrictionActive(Enum_AddOnRestrictionType_ChallengeMode)
+	if not C_RestrictedActions_IsAddOnRestrictionActive or not Enum_AddOnRestrictionType_ChallengeMode then
+		return true
+	end
+	return not C_RestrictedActions_IsAddOnRestrictionActive(Enum_AddOnRestrictionType_ChallengeMode)
 end
 
 function A:AddHistory(text, channel)

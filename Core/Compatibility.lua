@@ -21,8 +21,12 @@ function W:ConstructCompatibilityFrame()
 	frame:Size(550, 500)
 	frame:Point("CENTER")
 	frame:CreateBackdrop("Transparent")
-	S:CreateShadowModule(frame.backdrop)
-	S:MerathilisUISkin(frame.backdrop)
+	if S and type(S.CreateShadowModule) == "function" then
+		S:CreateShadowModule(frame.backdrop)
+	end
+	if S and type(S.MerathilisUISkin) == "function" then
+		S:MerathilisUISkin(frame.backdrop)
+	end
 	frame.numModules = 0
 	frame:Hide()
 	frame:SetScript("OnHide", function()
@@ -33,7 +37,9 @@ function W:ConstructCompatibilityFrame()
 
 	frame:SetFrameStrata("TOOLTIP")
 	frame:SetFrameLevel(9000)
-	MF:InternalHandle(frame)
+	if MF and type(MF.InternalHandle) == "function" then
+		MF:InternalHandle(frame)
+	end
 
 	local close = F.Widgets.New("CloseButton", frame)
 	if close then
@@ -93,7 +99,7 @@ function W:ConstructCompatibilityFrame()
 	bottomDesc:Point("BOTTOMLEFT", frame, "BOTTOMLEFT", 10, 10)
 
 	local completeButton =
-		CreateFrame("Button", "WTCompatibilityFrameCompleteButton", frame, "UIPanelButtonTemplate, BackdropTemplate")
+		CreateFrame("Button", "WTCompatibilityFrameCompleteButton", frame, "UIPanelButtonTemplate")
 	---@cast completeButton Button
 	completeButton.Text:SetText(L["Complete"])
 	completeButton.Text:SetJustifyH("CENTER")
@@ -131,7 +137,7 @@ local function AddButtonToCompatibilityFrame(data)
 		"Button",
 		"WTCompatibilityFrameLeftButton" .. frame.numModules,
 		frame.scrollFrame,
-		"UIPanelButtonTemplate, BackdropTemplate"
+		"UIPanelButtonTemplate"
 	)
 	---@cast leftButton Button
 	leftButton.Text:SetText(format("%s\n%s", data.module1, data.plugin1))
@@ -164,7 +170,7 @@ local function AddButtonToCompatibilityFrame(data)
 		"Button",
 		"WTCompatibilityFrameRightButton" .. frame.numModules,
 		frame.scrollFrame,
-		"UIPanelButtonTemplate, BackdropTemplate"
+		"UIPanelButtonTemplate"
 	)
 	---@cast rightButton Button
 	rightButton.Text:SetText(format("%s\n%s", data.module2, data.plugin2))

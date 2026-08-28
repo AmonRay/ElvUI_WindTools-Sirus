@@ -15,20 +15,44 @@ local AccumulateOp = AccumulateOp
 local GetTime = GetTime
 
 local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
-local C_Map_GetBestMapForUnit = C_Map and C_Map.GetBestMapForUnit or function() return nil end
-local C_QuestLog_AddQuestWatch = C_QuestLog and C_QuestLog.AddQuestWatch or function() end
+local C_Map_GetBestMapForUnit = C_Map and C_Map.GetBestMapForUnit
+local LegacyGetCurrentMapAreaID = GetCurrentMapAreaID
+local function GetBestMapForUnit(unit)
+	if C_Map_GetBestMapForUnit then return C_Map_GetBestMapForUnit(unit) end
+	if SetMapToCurrentZone and LegacyGetCurrentMapAreaID then
+		SetMapToCurrentZone()
+		return LegacyGetCurrentMapAreaID()
+	end
+end
+local C_QuestLog_AddQuestWatch = C_QuestLog and C_QuestLog.AddQuestWatch or AddQuestWatch
 local C_QuestLog_AddWorldQuestWatch = C_QuestLog and C_QuestLog.AddWorldQuestWatch or function() end
 local C_QuestLog_GetActivePreyQuest = C_QuestLog and C_QuestLog.GetActivePreyQuest or function() return nil end
 local C_QuestLog_GetDistanceSqToQuest = C_QuestLog and C_QuestLog.GetDistanceSqToQuest or function() return nil end
 local C_QuestLog_GetNextWaypointForMap = C_QuestLog and C_QuestLog.GetNextWaypointForMap or function() return nil end
 local C_QuestLog_GetQuestTagInfo = C_QuestLog and C_QuestLog.GetQuestTagInfo or function() return nil end
-local C_QuestLog_GetQuestsOnMap = C_QuestLog and C_QuestLog.GetQuestsOnMap or function() return {} end
-local C_QuestLog_GetTitleForQuestID = C_QuestLog and C_QuestLog.GetTitleForQuestID or function() return nil end
-local C_QuestLog_IsOnMap = C_QuestLog and C_QuestLog.IsOnMap or function() return false end
-local C_QuestLog_IsWorldQuest = C_QuestLog and C_QuestLog.IsWorldQuest or function() return false end
+local C_QuestLog_GetQuestsOnMap = C_QuestLog and C_QuestLog.GetQuestsOnMap or GetQuestsOnMap
+local C_QuestLog_GetTitleForQuestID = C_QuestLog and C_QuestLog.GetTitleForQuestID
+local function GetTitleForQuestID(questID)
+	if C_QuestLog_GetTitleForQuestID then return C_QuestLog_GetTitleForQuestID(questID) end
+	if not GetQuestLogTitle or not GetNumQuestLogEntries then return nil end
+	for index = 1, GetNumQuestLogEntries() do
+		local title, _, _, _, isHeader, _, _, _, id = GetQuestLogTitle(index)
+		if not isHeader and id == questID then return title end
+	end
+end
+local C_QuestLog_IsOnMap = C_QuestLog and C_QuestLog.IsOnMap
+local function IsQuestOnMap(questID, mapID)
+	if C_QuestLog_IsOnMap then return C_QuestLog_IsOnMap(questID) end
+	return QuestHasMapIcon(questID, mapID)
+end
+local C_QuestLog_IsWorldQuest = C_QuestLog and C_QuestLog.IsWorldQuest or IsWorldQuest
 local C_SuperTrack_GetSuperTrackedQuestID = C_SuperTrack and C_SuperTrack.GetSuperTrackedQuestID or function() return nil end
 local C_SuperTrack_SetSuperTrackedQuestID = C_SuperTrack and C_SuperTrack.SetSuperTrackedQuestID or function() end
-local C_TaskQuest_GetQuestsOnMap = C_TaskQuest and C_TaskQuest.GetQuestsOnMap or function() return {} end
+local C_TaskQuest_GetQuestsOnMap = C_TaskQuest and C_TaskQuest.GetQuestsOnMap or GetQuestsOnMap
+local function GetTasksOnMap(mapID)
+	if C_TaskQuest_GetQuestsOnMap then return C_TaskQuest_GetQuestsOnMap(mapID) end
+	return {}
+end
 local C_VignetteInfo_GetVignetteInfo = C_VignetteInfo and C_VignetteInfo.GetVignetteInfo or function() return nil end
 local C_VignetteInfo_GetVignettes = C_VignetteInfo and C_VignetteInfo.GetVignettes or function() return {} end
 local QuestWatchType = _G.Enum and _G.Enum.QuestWatchType or {}
@@ -45,7 +69,7 @@ local VIGNETTE_DATA = {
 }
 
 local function NotifyStartTracking(questID)
-	local title = tostring(C_QuestLog_GetTitleForQuestID(questID) or questID)
+	local title = tostring(GetTitleForQuestID(questID) or questID)
 	title = C.StringByTemplate(title, "indigo-300")
 	local tag = C.StringByTemplate(format("[%s]", L["Prey Hunt"]), "amber-500")
 	F.Print(format("%s %s", tag, format(L["Start tracking %s."], title)))
@@ -227,7 +251,7 @@ function PH:TryAutoTrack()
 	end
 	self.lastAutoTrackTime = now
 
-	local mapID = C_Map_GetBestMapForUnit("player")
+	local mapID = GetBestMapForUnit("player")
 	if not mapID then
 		return
 	end
@@ -237,7 +261,7 @@ function PH:TryAutoTrack()
 	local bestDistSq = math_huge
 
 	if autoTrack.worldQuest then
-		local tasks = C_TaskQuest_GetQuestsOnMap(mapID)
+		local tasks = GetTasksOnMap(mapID)
 		if tasks then
 			for _, info in ipairs(tasks) do
 				if C_QuestLog_IsWorldQuest(info.questID) then
@@ -266,7 +290,7 @@ function PH:TryAutoTrack()
 		return
 	end
 
-	if autoTrack.stageQuest and C_QuestLog_IsOnMap(activePreyQuestID) and QuestHasMapIcon(activePreyQuestID, mapID) then
+	if autoTrack.stageQuest and IsQuestOnMap(activePreyQuestID, mapID) and QuestHasMapIcon(activePreyQuestID, mapID) then
 		C_QuestLog_AddQuestWatch(activePreyQuestID)
 
 		if superTrackedID ~= activePreyQuestID then

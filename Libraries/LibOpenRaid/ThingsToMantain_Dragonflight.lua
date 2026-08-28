@@ -1107,7 +1107,7 @@ do
 	end
 
 	--this will make sure to always have the latest data
-	C_Timer.After(0, function()
+	C_Timer:After(0, function()
 		if (openRaidLib.__version == LIB_OPEN_RAID_MAX_VERSION) then
 			loadLibDatabase()
 		end
@@ -1125,7 +1125,7 @@ end
 
 LIB_OPEN_RAID_CROWDCONTROL = {}
 
-C_Timer.After(5, function()
+C_Timer:After(5, function()
 	--for debugging, compares which crowd control spells are in the details framework that are not in the lib
 	local notInLib = {}
 

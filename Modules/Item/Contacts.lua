@@ -30,7 +30,10 @@ local C_BattleNet_GetFriendAccountInfo = C_BattleNet and C_BattleNet.GetFriendAc
 local C_BattleNet_GetFriendGameAccountInfo = C_BattleNet and C_BattleNet.GetFriendGameAccountInfo or function() return nil end
 local C_BattleNet_GetFriendNumGameAccounts = C_BattleNet and C_BattleNet.GetFriendNumGameAccounts or function() return 0 end
 local C_FriendList_GetFriendInfoByIndex = C_FriendList and C_FriendList.GetFriendInfoByIndex or GetFriendInfo
-local C_FriendList_GetNumOnlineFriends = C_FriendList and C_FriendList.GetNumOnlineFriends or GetNumFriendsOnline
+local C_FriendList_GetNumOnlineFriends = C_FriendList and C_FriendList.GetNumOnlineFriends or function()
+	-- Wrath 3.3.5a: GetNumFriends() returns (numTotal, numOnline).
+	return (select(2, GetNumFriends()))
+end
 
 local LOCALIZED_CLASS_NAMES_FEMALE = LOCALIZED_CLASS_NAMES_FEMALE
 local LOCALIZED_CLASS_NAMES_MALE = LOCALIZED_CLASS_NAMES_MALE
@@ -134,6 +137,19 @@ function CT:ShowContextText(button)
 					E.global.WT.item.contacts.favorites[button.name .. "-" .. button.realm] = true
 				end
 			end)
+
+			if button.dType ~= "alt" then
+				rootDescription:CreateButton(L["Add This Alt"], function()
+					if button.realm then
+						local contacts = E.global.WT.item.contacts
+						contacts.alts = contacts.alts or {}
+						contacts.alts[button.realm] = contacts.alts[button.realm] or {}
+						local factionKey = button.faction or E.myfaction
+						contacts.alts[button.realm][factionKey] = contacts.alts[button.realm][factionKey] or {}
+						contacts.alts[button.realm][factionKey][button.name] = button.class
+					end
+				end)
+			end
 		end
 	end)
 end
@@ -352,7 +368,7 @@ function CT:ConstructPageController()
 		end
 	end)
 
-	local slider = CreateFrame("Slider", "WTContactsSlider", self.frame, "BackdropTemplate")
+	local slider = CreateFrame("Slider", "WTContactsSlider", self.frame)
 	slider:Size(80, 20)
 	slider:Point("BOTTOM", self.frame, "BOTTOM", 0, 8)
 	slider:SetOrientation("HORIZONTAL")
@@ -496,8 +512,18 @@ function CT:UpdatePage(pageIndex)
 end
 
 function CT:UpdateAltsTable()
+	-- Plugin global defaults may not be merged into E.global.WT on every ElvUI
+	-- build; create the contacts tree on demand so the module never dies here.
+	local contacts = E.global.WT and E.global.WT.item and E.global.WT.item.contacts
+	if not contacts then
+		E.global.WT = E.global.WT or {}
+		E.global.WT.item = E.global.WT.item or {}
+		E.global.WT.item.contacts = { alts = {}, favorites = {}, updateAlts = true }
+		contacts = E.global.WT.item.contacts
+	end
+
 	if not self.altsTable then
-		self.altsTable = E.global.WT.item.contacts.alts
+		self.altsTable = contacts.alts
 	end
 
 	if not E.global.WT.item.contacts.updateAlts then
@@ -540,19 +566,42 @@ function CT:BuildFriendsData()
 	data = {}
 
 	local tempKey = {}
-	local numWoWFriend = C_FriendList_GetNumOnlineFriends()
-	for i = 1, numWoWFriend do
-		local info = C_FriendList_GetFriendInfoByIndex(i)
-		if info.connected then
-			local name, realm = F.Strings.Split(info.name, "-")
-			realm = realm or E.myrealm
-			tinsert(data, {
-				name = name,
-				realm = realm,
-				class = GetNonLocalizedClass(info.className),
-				dType = "friend",
-			})
-			tempKey[name .. "-" .. realm] = true
+
+	if not (C_FriendList and C_FriendList.GetNumOnlineFriends) then
+		-- Wrath 3.3.5a (Sirus): GetNumFriends() returns (numTotal, numOnline);
+		-- GetFriendInfo(i) returns (name, level, class, area, connected, status, note).
+		-- C_FriendList exists here as a stub WITHOUT GetNumOnlineFriends/GetFriendInfoByIndex,
+		-- so we must use the legacy Wrath globals, not the retail C_FriendList path.
+		local numWoWTotal, numWoWOnline = GetNumFriends()
+		for i = 1, numWoWTotal do
+			local name, level, class, area, connected = GetFriendInfo(i)
+			if connected then
+				local plainName, realm = F.Strings.Split(name, "-")
+				realm = realm or E.myrealm
+				tinsert(data, {
+					name = plainName,
+					realm = realm,
+					class = class,
+					dType = "friend",
+				})
+				tempKey[plainName .. "-" .. realm] = true
+			end
+		end
+	else
+		local numWoWFriend = C_FriendList_GetNumOnlineFriends()
+		for i = 1, numWoWFriend do
+			local info = C_FriendList_GetFriendInfoByIndex(i)
+			if info.connected then
+				local name, realm = F.Strings.Split(info.name, "-")
+				realm = realm or E.myrealm
+				tinsert(data, {
+					name = name,
+					realm = realm,
+					class = GetNonLocalizedClass(info.className),
+					dType = "friend",
+				})
+				tempKey[name .. "-" .. realm] = true
+			end
 		end
 	end
 
@@ -619,7 +668,11 @@ end
 
 function CT:BuildFavoriteData()
 	data = {}
-	for fullName in pairs(E.global.WT.item.contacts.favorites) do
+	local favorites = E.global.WT and E.global.WT.item and E.global.WT.item.contacts and E.global.WT.item.contacts.favorites
+	if not favorites then
+		return
+	end
+	for fullName in pairs(favorites) do
 		local name, realm = F.Strings.Split(fullName, "-")
 		realm = realm or E.myrealm
 		tinsert(data, {
@@ -666,7 +719,7 @@ function CT:Initialize()
 	self:UpdateAltsTable()
 	self.db = E.db.WT.item.contacts
 
-	if not self.db.enable or self.initialized then
+	if not self.db or not self.db.enable or self.initialized then
 		return
 	end
 

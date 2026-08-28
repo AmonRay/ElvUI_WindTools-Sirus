@@ -31,8 +31,11 @@ function WS:HandleTab(_, tab, noBackdrop, template)
 	end
 
 	local db = E.private.WT and E.private.WT.skins and E.private.WT.skins.widgets and E.private.WT.skins.widgets.tab
+	if not db then
+		return
+	end
 
-	if db.text.enable then
+	if db.text and db.text.enable then
 		local text = tab.text or tab.Text or tab.GetName and tab:GetName() and _G[tab:GetName() .. "Text"]
 		if text and text.GetTextColor then
 			F.SetFontWithDB(text, db.text.font)
@@ -40,7 +43,7 @@ function WS:HandleTab(_, tab, noBackdrop, template)
 		end
 	end
 
-	if db.backdrop.enable and (tab.template or tab.backdrop) then
+	if db.backdrop and db.backdrop.enable and (tab.template or tab.backdrop) then
 		local parentFrame = tab.backdrop or tab
 
 		-- Create background
@@ -113,14 +116,16 @@ do
 			tab.windWidgetText:SetTextColor(color.r, color.g, color.b)
 		end
 
-		if not db.selected.enable then
+		if not db.selected or not db.selected.enable or not tab.backdrop.SetBackdropBorderColor or not tab.backdrop.SetBackdropColor then
 			return ES.Ace3_TabSetSelected_(tab, selected)
 		end
 
 		local borderColor = db.selected.borderClassColor and E.myClassColor or db.selected.borderColor
 		local backdropColor = db.selected.backdropClassColor and E.myClassColor or db.selected.backdropColor
 		if selected then
-			tab.backdrop.Center:SetTexture(LSM:Fetch("statusbar", db.selected.texture) or E.media.glossTex)
+			if tab.backdrop.Center and tab.backdrop.Center.SetTexture then
+				tab.backdrop.Center:SetTexture(LSM:Fetch("statusbar", db.selected.texture) or E.media.glossTex)
+			end
 			tab.backdrop:SetBackdropBorderColor(borderColor.r, borderColor.g, borderColor.b, db.selected.borderAlpha)
 			tab.backdrop:SetBackdropColor(backdropColor.r, backdropColor.g, backdropColor.b, db.selected.backdropAlpha)
 
@@ -129,7 +134,9 @@ do
 				tab.wasRaised = true
 			end
 		else
-			tab.backdrop.Center:SetTexture(E.media.glossTex)
+			if tab.backdrop.Center and tab.backdrop.Center.SetTexture then
+				tab.backdrop.Center:SetTexture(E.media.glossTex)
+			end
 			local r, g, b = unpack(E.media.bordercolor)
 			tab.backdrop:SetBackdropBorderColor(r, g, b, 1)
 			r, g, b = unpack(E.media.backdropcolor)

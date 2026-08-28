@@ -233,16 +233,20 @@ end
 ---@param file string The file path relative to media type folder
 ---@param type string The media type ("Icons" or "Textures")
 local function AddMedia(name, file, type)
-	W.Media[type][name] = MediaPath .. type .. "/" .. file
+	-- Use a single separator style throughout: this modified 3.3.5a client fails
+	-- to resolve textures whose path mixes \\ and / (all working addons use one style).
+	-- The file argument itself may contain forward slashes (e.g. "GameBar/Achievements.tga"),
+	-- so normalize the whole path to backslashes here.
+	W.Media[type][name] = MediaPath .. type .. "\\" .. (file:gsub("/", "\\"))
 end
 
 ---Pack role icon into media registry
 ---@param pack string The role icon style pack name
 local function AddRoleIconPack(pack)
 	W.Media.RoleIcons[strupper(pack)] = {
-		TANK = MediaPath .. "RoleIcons/" .. pack .. "/Tank.tga",
-		HEALER = MediaPath .. "RoleIcons/" .. pack .. "/Healer.tga",
-		DAMAGER = MediaPath .. "RoleIcons/" .. pack .. "/DPS.tga",
+		TANK = MediaPath .. "RoleIcons\\" .. pack .. "\\Tank.tga",
+		HEALER = MediaPath .. "RoleIcons\\" .. pack .. "\\Healer.tga",
+		DAMAGER = MediaPath .. "RoleIcons\\" .. pack .. "\\DPS.tga",
 	}
 end
 
@@ -472,7 +476,7 @@ function F.GetClassIconWithStyle(class, style)
 		return
 	end
 
-	return MediaPath .. "Icons/ClassIcon/" .. strlower(class) .. "_" .. style .. ".tga"
+	return MediaPath .. "Icons\\ClassIcon\\" .. strlower(class) .. "_" .. style .. ".tga"
 end
 
 ---Generate class icon string with specified style and dimensions
@@ -596,11 +600,11 @@ do
 	local locale = GetLocale()
 	if LSM["LOCALE_BIT_" .. locale] then
 		local region = LSM["LOCALE_BIT_" .. locale]
-		LSM:Register("font", "Accidental Presidency (en)", MediaPath .. "Fonts/AccidentalPresidency.ttf", region)
-		LSM:Register("font", "Chivo Mono (en)", MediaPath .. "Fonts/ChivoMono.ttf", region)
-		LSM:Register("font", "LINE Seed (en)", MediaPath .. "Fonts/LineSeed.otf", region)
-		LSM:Register("font", "Montserrat (en)", MediaPath .. "Fonts/Montserrat.ttf", region)
-		LSM:Register("font", "Roadway (en)", MediaPath .. "Fonts/Roadway.ttf", region)
+		LSM:Register("font", "Accidental Presidency (en)", MediaPath .. "Fonts\\AccidentalPresidency.ttf", region)
+		LSM:Register("font", "Chivo Mono (en)", MediaPath .. "Fonts\\ChivoMono.ttf", region)
+		LSM:Register("font", "LINE Seed (en)", MediaPath .. "Fonts\\LineSeed.otf", region)
+		LSM:Register("font", "Montserrat (en)", MediaPath .. "Fonts\\Montserrat.ttf", region)
+		LSM:Register("font", "Roadway (en)", MediaPath .. "Fonts\\Roadway.ttf", region)
 		LSM:Register("font", "Homespun (en)", "Interface/Addons/ElvUI/Game/Shared/Media/Fonts/Homespun.ttf", region)
 		LSM:Register(
 			"font",
@@ -616,35 +620,35 @@ do
 		LSM:Register(
 			"font",
 			"Accidental Presidency",
-			MediaPath .. "Fonts/AccidentalPresidency.ttf",
+			MediaPath .. "Fonts\\AccidentalPresidency.ttf",
 			LSM.LOCALE_BIT_western
 		)
-		LSM:Register("font", "Chivo Mono", MediaPath .. "Fonts/ChivoMono.ttf", LSM.LOCALE_BIT_western)
-		LSM:Register("font", "LINE Seed", MediaPath .. "Fonts/LineSeed.otf", LSM.LOCALE_BIT_western)
-		LSM:Register("font", "Montserrat", MediaPath .. "Fonts/Montserrat.ttf", LSM.LOCALE_BIT_western)
-		LSM:Register("font", "Roadway", MediaPath .. "Fonts/Roadway.ttf", LSM.LOCALE_BIT_western)
+		LSM:Register("font", "Chivo Mono", MediaPath .. "Fonts\\ChivoMono.ttf", LSM.LOCALE_BIT_western)
+		LSM:Register("font", "LINE Seed", MediaPath .. "Fonts\\LineSeed.otf", LSM.LOCALE_BIT_western)
+		LSM:Register("font", "Montserrat", MediaPath .. "Fonts\\Montserrat.ttf", LSM.LOCALE_BIT_western)
+		LSM:Register("font", "Roadway", MediaPath .. "Fonts\\Roadway.ttf", LSM.LOCALE_BIT_western)
 		W.CompatibleFont = false
 	end
 end
 
-LSM:Register("statusbar", "WindTools Glow", MediaPath .. "Textures/StatusbarGlow.tga")
-LSM:Register("statusbar", "WindTools Flat", MediaPath .. "Textures/StatusbarFlat.blp")
-LSM:Register("statusbar", "WindTools Light", MediaPath .. "Textures/StatusbarLight.tga")
-LSM:Register("statusbar", "WindTools Clean", MediaPath .. "Textures/StatusbarClean.tga")
-LSM:Register("statusbar", "WindTools Background", MediaPath .. "Textures/StatusbarBackground.tga")
+LSM:Register("statusbar", "WindTools Glow", MediaPath .. "Textures\\StatusbarGlow.tga")
+LSM:Register("statusbar", "WindTools Flat", MediaPath .. "Textures\\StatusbarFlat.blp")
+LSM:Register("statusbar", "WindTools Light", MediaPath .. "Textures\\StatusbarLight.tga")
+LSM:Register("statusbar", "WindTools Clean", MediaPath .. "Textures\\StatusbarClean.tga")
+LSM:Register("statusbar", "WindTools Background", MediaPath .. "Textures\\StatusbarBackground.tga")
 
-LSM:Register("statusbar", "ToxiUI Clean", MediaPath .. "Textures/ToxiUI/ToxiUI-clean.tga")
-LSM:Register("statusbar", "ToxiUI Dark", MediaPath .. "Textures/ToxiUI/ToxiUI-dark.tga")
-LSM:Register("statusbar", "ToxiUI Gradient 1", MediaPath .. "Textures/ToxiUI/ToxiUI-g1.tga")
-LSM:Register("statusbar", "ToxiUI Gradient 2", MediaPath .. "Textures/ToxiUI/ToxiUI-g2.tga")
-LSM:Register("statusbar", "ToxiUI Gradient 3", MediaPath .. "Textures/ToxiUI/ToxiUI-grad.tga")
-LSM:Register("statusbar", "ToxiUI Half", MediaPath .. "Textures/ToxiUI/ToxiUI-half.tga")
+LSM:Register("statusbar", "ToxiUI Clean", MediaPath .. "Textures\\ToxiUI\\ToxiUI-clean.tga")
+LSM:Register("statusbar", "ToxiUI Dark", MediaPath .. "Textures\\ToxiUI\\ToxiUI-dark.tga")
+LSM:Register("statusbar", "ToxiUI Gradient 1", MediaPath .. "Textures\\ToxiUI\\ToxiUI-g1.tga")
+LSM:Register("statusbar", "ToxiUI Gradient 2", MediaPath .. "Textures\\ToxiUI\\ToxiUI-g2.tga")
+LSM:Register("statusbar", "ToxiUI Gradient 3", MediaPath .. "Textures\\ToxiUI\\ToxiUI-grad.tga")
+LSM:Register("statusbar", "ToxiUI Half", MediaPath .. "Textures\\ToxiUI\\ToxiUI-half.tga")
 
-LSM:Register("sound", "OnePlus Light", MediaPath .. "Sounds/OnePlusLight.ogg")
-LSM:Register("sound", "OnePlus Surprise", MediaPath .. "Sounds/OnePlusSurprise.ogg")
-LSM:Register("sound", "WT Accept", MediaPath .. "Sounds/Accept.ogg")
-LSM:Register("sound", "WT Clear", MediaPath .. "Sounds/Clear.ogg")
-LSM:Register("sound", "WT Complete", MediaPath .. "Sounds/Complete.ogg")
-LSM:Register("sound", "WT Simple", MediaPath .. "Sounds/Simple.ogg")
-LSM:Register("sound", "WT Success", MediaPath .. "Sounds/Success.ogg")
-LSM:Register("sound", "WT Win", MediaPath .. "Sounds/Win.ogg")
+LSM:Register("sound", "OnePlus Light", MediaPath .. "Sounds\\OnePlusLight.ogg")
+LSM:Register("sound", "OnePlus Surprise", MediaPath .. "Sounds\\OnePlusSurprise.ogg")
+LSM:Register("sound", "WT Accept", MediaPath .. "Sounds\\Accept.ogg")
+LSM:Register("sound", "WT Clear", MediaPath .. "Sounds\\Clear.ogg")
+LSM:Register("sound", "WT Complete", MediaPath .. "Sounds\\Complete.ogg")
+LSM:Register("sound", "WT Simple", MediaPath .. "Sounds\\Simple.ogg")
+LSM:Register("sound", "WT Success", MediaPath .. "Sounds\\Success.ogg")
+LSM:Register("sound", "WT Win", MediaPath .. "Sounds\\Win.ogg")

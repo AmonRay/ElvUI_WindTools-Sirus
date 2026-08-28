@@ -6,7 +6,7 @@ local RunNextFrame = RunNextFrame
 local UnitName = UnitName
 
 local C_RestrictedActions = _G.C_RestrictedActions
-local C_RestrictedActions_IsAddOnRestrictionActive = C_RestrictedActions and C_RestrictedActions.IsAddOnRestrictionActive or function() return false end
+local C_RestrictedActions_IsAddOnRestrictionActive = C_RestrictedActions and C_RestrictedActions.IsAddOnRestrictionActive
 
 local LE_PARTY_CATEGORY_INSTANCE = LE_PARTY_CATEGORY_INSTANCE
 local Enum_AddOnRestrictionType = _G.Enum and _G.Enum.AddOnRestrictionType
@@ -67,7 +67,7 @@ function A:CHALLENGE_MODE_COMPLETED()
 end
 
 function A:UNIT_SPELLCAST_SUCCEEDED(_, unit, _, spellID)
-	if C_RestrictedActions_IsAddOnRestrictionActive(Enum_AddOnRestrictionType_ChallengeMode) then
+	if C_RestrictedActions_IsAddOnRestrictionActive and Enum_AddOnRestrictionType_ChallengeMode and C_RestrictedActions_IsAddOnRestrictionActive(Enum_AddOnRestrictionType_ChallengeMode) then
 		return
 	end
 

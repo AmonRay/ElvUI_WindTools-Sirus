@@ -17,7 +17,9 @@ local tonumber = tonumber
 local unpack = unpack
 local wipe = wipe
 
-local CooldownFrame_Set = CooldownFrame_Set
+-- Wrath uses CooldownFrame_SetTimer (retail renamed it CooldownFrame_Set).
+-- Prefer the Wrath function, which is what exists on the 3.3.5a client.
+local CooldownFrame_Set = CooldownFrame_SetTimer or CooldownFrame_Set
 local CreateAtlasMarkup = CreateAtlasMarkup
 local CreateFrame = CreateFrame
 local GameTooltip = _G.GameTooltip
@@ -35,14 +37,16 @@ local C_Item = _G.C_Item
 local C_QuestLog = _G.C_QuestLog
 local C_TradeSkillUI = _G.C_TradeSkillUI
 local C_Item_GetItemCooldown = C_Item and C_Item.GetItemCooldown or GetInventoryItemCooldown
-local C_Item_GetItemCount = C_Item and C_Item.GetItemCount or function(itemID) return GetItemCount(itemID) end
-local C_Item_GetItemInfoInstant = W.Compatibility.GetItemInfoInstant
-local C_Item_IsItemInRange = C_Item and C_Item.IsItemInRange or function() return nil end
-local C_Item_IsUsableItem = C_Item and C_Item.IsUsableItem or function() return true end
+local C_Item_GetItemCount = C_Item and C_Item.GetItemCount or GetItemCount
+local C_Item_GetItemInfoInstant = W.Compatibility.GetItemInfoInstant or GetItemInfoInstant
+local C_Item_IsItemInRange = C_Item and C_Item.IsItemInRange or IsItemInRange
+local C_Item_IsUsableItem = C_Item and C_Item.IsUsableItem or IsUsableItem
 local C_QuestLog_GetDistanceSqToQuest = C_QuestLog and C_QuestLog.GetDistanceSqToQuest or function() return nil end
 local C_QuestLog_GetNumQuestLogEntries = C_QuestLog and C_QuestLog.GetNumQuestLogEntries or GetNumQuestLogEntries
 local C_QuestLog_GetQuestIDForLogIndex = C_QuestLog and C_QuestLog.GetQuestIDForLogIndex or function() return nil end
-local C_Timer_NewTicker = W.Compatibility.HasTimerAPI and _G.C_Timer.NewTicker
+local C_Timer_NewTicker = W.Compatibility.NewTicker
+-- Reagent quality is a retail (Cata+) TradeSkill feature absent on 3.3.5a; the
+-- nil-safe fallback hides the quality tier text on Wrath buttons.
 local C_TradeSkillUI_GetItemReagentQualityInfo = C_TradeSkillUI and C_TradeSkillUI.GetItemReagentQualityInfo or function() return nil end
 
 local questItemList = {}
@@ -140,7 +144,7 @@ do
 end
 
 function EB:CreateButton(name, barDB)
-	local button = CreateFrame("Button", name, E.UIParent, "SecureActionButtonTemplate, BackdropTemplate") --[[@as Button]]
+	local button = CreateFrame("Button", name, E.UIParent, "SecureActionButtonTemplate") --[[@as Button]]
 	button:Size(barDB.buttonWidth, barDB.buttonHeight)
 	button:SetTemplate("Default")
 	button:SetClampedToScreen(true)

@@ -353,16 +353,6 @@ options.reset = {
 						end)
 					end,
 				},
-				damageMeterLayout = {
-					order = 4,
-					type = "execute",
-					name = L["Damage Meter Layout"],
-					func = function()
-						E:StaticPopup_Show("WINDTOOLS_RESET_MODULE", L["Damage Meter Layout"], nil, function()
-							E.db.WT.combat.damageMeterLayout = P.combat.damageMeterLayout
-						end)
-					end,
-				},
 			},
 		},
 		item = {
@@ -885,16 +875,6 @@ options.reset = {
 						end)
 					end,
 				},
-				damageMeter = {
-					order = 4,
-					type = "execute",
-					name = L["Damage Meter"],
-					func = function()
-						E:StaticPopup_Show("WINDTOOLS_RESET_MODULE", L["Damage Meter"], nil, function()
-							E.private.WT.skins.damageMeter = V.skins.damageMeter
-						end)
-					end,
-				},
 				lossOfControl = {
 					order = 5,
 					type = "execute",
@@ -912,6 +892,16 @@ options.reset = {
 					func = function()
 						E:StaticPopup_Show("WINDTOOLS_RESET_MODULE", L["Blizzard"], nil, function()
 							E.private.WT.skins.blizzard = V.skins.blizzard
+						end)
+					end,
+				},
+				details = {
+					order = 7,
+					type = "execute",
+					name = L["Details"],
+					func = function()
+						E:StaticPopup_Show("WINDTOOLS_RESET_MODULE", L["Details"], nil, function()
+							E.private.WT.skins.details = V.skins.details
 						end)
 					end,
 				},

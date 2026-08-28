@@ -9,15 +9,25 @@ local pairs = pairs
 local tinsert = tinsert
 local type = type
 
-local GetCurrentRegion = GetCurrentRegion
-local GetProfessionInfo = GetProfessionInfo
-local GetProfessions = GetProfessions
-local GetServerTime = GetServerTime
+local GetCurrentRegion = GetCurrentRegion or function() return 1 end
+-- Professions/weekly quests are retail-only; the globals may be absent or registered late on 3.3.5a.
+local GetProfessionInfo = GetProfessionInfo or function() return nil end
+local GetProfessions = GetProfessions or function() return nil end
+local GetServerTime = GetServerTime or function() return time() end
 
-local C_Map_GetMapInfo = C_Map and C_Map.GetMapInfo or function(mapID) return { mapID = mapID, name = tostring(mapID) } end
-local C_QuestLog_GetTitleForQuestID = C_QuestLog and C_QuestLog.GetTitleForQuestID or function() return nil end
-local C_QuestLog_IsOnQuest = C_QuestLog and C_QuestLog.IsOnQuest or function() return false end
-local C_QuestLog_IsQuestFlaggedCompleted = C_QuestLog and C_QuestLog.IsQuestFlaggedCompleted or function() return false end
+local C_Map_GetMapInfo = C_Map and C_Map.GetMapInfo or function(mapID)
+	local name = GetMapInfo and select(1, GetMapInfo(mapID))
+	return { mapID = mapID, name = name or tostring(mapID) }
+end
+local C_QuestLog_GetTitleForQuestID = C_QuestLog and C_QuestLog.GetTitleForQuestID or function(questID)
+	if not GetQuestLogTitle then return nil end
+	for index = 1, GetNumQuestLogEntries() do
+		local title, _, _, _, isHeader, _, _, _, id = GetQuestLogTitle(index)
+		if not isHeader and id == questID then return title end
+	end
+end
+local C_QuestLog_IsOnQuest = C_QuestLog and C_QuestLog.IsOnQuest or IsQuestWatched or function() return false end
+local C_QuestLog_IsQuestFlaggedCompleted = W.Compatibility.IsQuestFlaggedCompleted or function() return false end
 
 local function GetWorldMapIDSetter(idOrFunc)
 	return function(...)
@@ -405,7 +415,7 @@ ET.EventData = {
 					[90] = 1757134800, -- Midnight PTR
 				}
 
-				local region = GetCurrentRegion()
+				local region = GetCurrentRegion() or 1
 				-- TW is not a real region, so we need to check the client language if player in KR
 				if region == 2 and W.Locale ~= "koKR" then
 					region = 4
@@ -445,7 +455,7 @@ ET.EventData = {
 					[90] = 1757134800, -- Midnight PTR
 				}
 
-				local region = GetCurrentRegion()
+				local region = GetCurrentRegion() or 1
 				-- TW is not a real region, so we need to check the client language if player in KR
 				if region == 2 and W.Locale ~= "koKR" then
 					region = 4
@@ -599,7 +609,7 @@ ET.EventData = {
 					[90] = 1675767600, -- Midnight PTR
 				}
 
-				local region = GetCurrentRegion()
+				local region = GetCurrentRegion() or 1
 				-- TW is not a real region, so we need to check the client language if player in KR
 				if region == 2 and W.Locale ~= "koKR" then
 					region = 4
@@ -644,7 +654,7 @@ ET.EventData = {
 					[72] = 1675767600, -- PTR
 					[90] = 1675767600, -- Midnight PTR
 				}
-				local region = GetCurrentRegion()
+				local region = GetCurrentRegion() or 1
 				-- TW is not a real region, so we need to check the client language if player in KR
 				if region == 2 and W.Locale ~= "koKR" then
 					region = 4
@@ -687,7 +697,7 @@ ET.EventData = {
 					[72] = 1670770800, -- PTR
 					[90] = 1670770800, -- Midnight PTR
 				}
-				local region = GetCurrentRegion()
+				local region = GetCurrentRegion() or 1
 				-- TW is not a real region, so we need to check the client language if player in KR
 				if region == 2 and W.Locale ~= "koKR" then
 					region = 4
@@ -731,7 +741,7 @@ ET.EventData = {
 					[72] = 1670702460, -- PTR
 					[90] = 1670702460, -- Midnight PTR
 				}
-				local region = GetCurrentRegion()
+				local region = GetCurrentRegion() or 1
 				-- TW is not a real region, so we need to check the client language if player in KR
 				if region == 2 and W.Locale ~= "koKR" then
 					region = 4
@@ -774,7 +784,7 @@ ET.EventData = {
 					[72] = 1701852315, -- PTR
 					[90] = 1701852315, -- Midnight PTR
 				}
-				local region = GetCurrentRegion()
+				local region = GetCurrentRegion() or 1
 				-- TW is not a real region, so we need to check the client language if player in KR
 				if region == 2 and W.Locale ~= "koKR" then
 					region = 4
@@ -817,7 +827,7 @@ ET.EventData = {
 					[72] = 1701828010, -- PTR
 					[90] = 1701828010, -- Midnight PTR
 				}
-				local region = GetCurrentRegion()
+				local region = GetCurrentRegion() or 1
 				-- TW is not a real region, so we need to check the client language if player in KR
 				if region == 2 and W.Locale ~= "koKR" then
 					region = 4
@@ -861,7 +871,7 @@ ET.EventData = {
 					[72] = 1701826200, -- PTR
 					[90] = 1701826200, -- Midnight PTR
 				}
-				local region = GetCurrentRegion()
+				local region = GetCurrentRegion() or 1
 				-- TW is not a real region, so we need to check the client language if player in KR
 				if region == 2 and W.Locale ~= "koKR" then
 					region = 4

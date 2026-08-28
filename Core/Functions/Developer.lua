@@ -19,6 +19,12 @@ local type = type
 
 F.Developer = {}
 
+-- ElvUI creates WT profile tables later during initialization. Logging is also
+-- used while options are being evaluated, so it must remain safe beforehand.
+E.global = E.global or {}
+E.global.WT = E.global.WT or {}
+E.global.WT.developer = E.global.WT.developer or { logLevel = 0 }
+
 ---Pretty print any object with table structure visualization
 ---Modified from https://www.cnblogs.com/leezj/p/4230271.html
 ---@param object any The object to print (table, string, number, etc.)
@@ -76,7 +82,10 @@ end
 ---Custom logger for warning messages
 ---@param ... string Message parts
 function F.Developer.LogWarning(...)
-	if E.global.WT.developer.logLevel < 2 then
+	local global = E and E.global
+	local wt = global and global.WT
+	local developer = wt and wt.developer
+	if not developer or (developer.logLevel or 0) < 2 then
 		return
 	end
 
@@ -87,7 +96,10 @@ end
 ---Custom logger for info messages
 ---@param ... string Message parts
 function F.Developer.LogInfo(...)
-	if E.global.WT.developer.logLevel < 3 then
+	local global = E and E.global
+	local wt = global and global.WT
+	local developer = wt and wt.developer
+	if not developer or (developer.logLevel or 0) < 3 then
 		return
 	end
 
@@ -98,7 +110,10 @@ end
 ---Custom logger for debug messages
 ---@param ... string Message parts
 function F.Developer.LogDebug(...)
-	if E.global.WT.developer.logLevel < 4 then
+	local global = E and E.global
+	local wt = global and global.WT
+	local developer = wt and wt.developer
+	if not developer or (developer.logLevel or 0) < 4 then
 		return
 	end
 

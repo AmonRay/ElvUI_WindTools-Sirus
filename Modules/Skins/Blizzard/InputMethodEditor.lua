@@ -4,7 +4,8 @@ local S = W.Modules.Skins ---@class Skins
 local _G = _G
 local pairs = pairs
 
-local Constants_ChatFrameConstants_MaxChatWindows = Constants.ChatFrameConstants.MaxChatWindows
+local chatFrameConstants = _G.Constants and _G.Constants.ChatFrameConstants
+local Constants_ChatFrameConstants_MaxChatWindows = chatFrameConstants and chatFrameConstants.MaxChatWindows or NUM_CHAT_WINDOWS or 7
 
 function S:InputMethodEditor()
 	if not self:CheckDB(nil, "inputMethodEditor") then

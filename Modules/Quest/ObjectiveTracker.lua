@@ -87,9 +87,13 @@ function OT:CosmeticBar(header)
 		bar = header:CreateTexture()
 		local backdrop = CreateFrame("Frame", nil, header)
 		backdrop:SetFrameStrata("BACKGROUND")
-		backdrop:SetTemplate()
+		-- "Transparent" so the underlay is only a border/shadow, not a solid black box
+		-- (the opaque SetTemplate produced a black underlay on quest-tracker headers).
+		backdrop:SetTemplate("Transparent")
 		backdrop:SetOutside(bar, 1, 1)
-		backdrop.Center:SetAlpha(0)
+		if backdrop.Center then
+			backdrop.Center:SetAlpha(0)
+		end
 		S:CreateShadow(backdrop, 2, nil, nil, nil, true)
 		bar.backdrop = backdrop
 		header.windCosmeticBar = bar
@@ -124,12 +128,23 @@ function OT:CosmeticBar(header)
 
 	-- Size
 	local width, height = self.db.cosmeticBar.width, self.db.cosmeticBar.height
-	if self.db.cosmeticBar.widthMode == "DYNAMIC" then
+	if self.db.cosmeticBar.widthMode == "DYNAMIC" and header.Text then
 		width = width + header.Text:GetStringWidth()
 	end
-	if self.db.cosmeticBar.heightMode == "DYNAMIC" then
+	if self.db.cosmeticBar.heightMode == "DYNAMIC" and header.Text then
 		height = height + header.Text:GetStringHeight()
 	end
+
+	-- Guard against NaN/absurd sizes from unrendered or custom-client font strings.
+	-- On the Sirus 3.3.5a fork these caused an overgrown bar and the endless
+	-- "scrolling" / oversized tracker underlay.
+	local function sane(v, def)
+		if type(v) ~= "number" or v ~= v or v <= 0 or v > 10000 then
+			return def
+		end
+		return v
+	end
+	width, height = sane(width, 250), sane(height, 2)
 
 	bar:Size(max(width, 1), max(height, 1))
 	bar:Show()
@@ -146,6 +161,17 @@ end
 function OT:UpdateBackdrop()
 	local frame = _G.ObjectiveTrackerFrame
 	if not frame then
+		return
+	end
+
+	-- The Sirus 3.3.5a custom tracker already renders its own container frame
+	-- (NineSlice) and stretches it under the contents. Adding a WindTools
+	-- full-size backdrop duplicates that underlay into a big overlaid box, so
+	-- skip it here and hide any leftover from an earlier run.
+	if frame.NineSlice or frame.ScrollFrame then
+		if frame.backdrop then
+			frame.backdrop:Hide()
+		end
 		return
 	end
 
@@ -286,7 +312,9 @@ function OT:HandleBlockHeader(frame)
 	if not self.db.title.wordWrap then
 		text:SetWordWrap(self.db.title.wordWrap)
 	end
-	text:Height(text:GetStringHeight() + 2)
+	-- NOTE: block header height is owned by the custom Sirus objective-tracker
+	-- layout (block:SetHeight / contentsHeight); forcing text:Height here inflated
+	-- block heights and produced an endless scroller on the 3.3.5a fork.
 
 	if self.db.title.uppercase and not W.AsianLocale then
 		local current = text:GetText()
@@ -352,7 +380,8 @@ function OT:HandleLine(line, _)
 	end
 
 	self:ColorfulProgression(line.Text)
-	line:Height(line.Text:GetHeight())
+	-- NOTE: line height is owned by the custom Sirus objective tracker layout;
+	-- forcing line:Height here delt extra blank space and bloated the scroller.
 end
 
 ---Handle objective block addition
@@ -498,9 +527,13 @@ function OT:Initialize()
 			self:ObjectiveTrackerModule_AddBlock(nil, block)
 		end)
 	end
-	self:SecureHook(_G.ScenarioObjectiveTracker, "UpdateCriteria", "ScenarioObjectiveTracker_UpdateCriteria")
+	if _G.ScenarioObjectiveTracker and _G.ScenarioObjectiveTracker.UpdateCriteria then
+		self:SecureHook(_G.ScenarioObjectiveTracker, "UpdateCriteria", "ScenarioObjectiveTracker_UpdateCriteria")
+	end
 
-	self:HandleContainerHeader(_G.ObjectiveTrackerFrame.Header)
+	if _G.ObjectiveTrackerFrame and _G.ObjectiveTrackerFrame.Header then
+		self:HandleContainerHeader(_G.ObjectiveTrackerFrame.Header)
+	end
 	self:UpdateBackdrop()
 	self:SortQuestWatches()
 end

@@ -10,22 +10,27 @@ function S:DressUpFrame()
 	end
 
 	self:CreateShadow(_G.DressUpFrame)
-	self:CreateShadow(_G.DressUpFrame.SetSelectionPanel)
-	self:CreateBackdropShadow(_G.DressUpFrame.CustomSetDetailsPanel)
 
-	hooksecurefunc(_G.DressUpFrame.SetSelectionPanel.ScrollBox, "Update", function(box)
-		box:ForEachFrame(function(frame)
-			if frame.__windSkin then
-				return
-			end
-			F.SetFont(frame.ItemName)
-			local width = frame.ItemSlot:GetWidth()
-			F.SetFont(frame.ItemSlot)
-			frame.ItemSlot:Width(width + 4)
+	-- SetSelectionPanel / CustomSetDetailsPanel are retail-only fields absent on
+	-- the 3.3.5a DressUpFrame; skip that part gracefully when missing.
+	if _G.DressUpFrame.SetSelectionPanel and _G.DressUpFrame.SetSelectionPanel.ScrollBox then
+		self:CreateShadow(_G.DressUpFrame.SetSelectionPanel)
+		self:CreateBackdropShadow(_G.DressUpFrame.CustomSetDetailsPanel)
 
-			frame.__windSkin = true
+		hooksecurefunc(_G.DressUpFrame.SetSelectionPanel.ScrollBox, "Update", function(box)
+			box:ForEachFrame(function(frame)
+				if frame.__windSkin then
+					return
+				end
+				F.SetFont(frame.ItemName)
+				local width = frame.ItemSlot:GetWidth()
+				F.SetFont(frame.ItemSlot)
+				frame.ItemSlot:Width(width + 4)
+
+				frame.__windSkin = true
+			end)
 		end)
-	end)
+	end
 end
 
 S:AddCallback("DressUpFrame")

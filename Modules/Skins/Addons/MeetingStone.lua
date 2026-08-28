@@ -144,7 +144,7 @@ local function ReskinMainPanel(mainPanel)
 	S:MerathilisUISkin(mainPanel)
 	mainPanel.PortraitFrame:Hide()
 	local CustomCloseButton =
-		CreateFrame("Button", "WTMeetingStoneCloseButton", mainPanel, "UIPanelCloseButton, BackdropTemplate")
+		CreateFrame("Button", "WTMeetingStoneCloseButton", mainPanel, "UIPanelCloseButton")
 	---@cast CustomCloseButton Button
 	CustomCloseButton:Point("TOPRIGHT", mainPanel.backdrop, "TOPRIGHT", 0, 0)
 	CustomCloseButton:SetScript("OnClick", mainPanel.CloseButton:GetScript("OnClick"))

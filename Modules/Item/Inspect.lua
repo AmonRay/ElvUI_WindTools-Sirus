@@ -33,10 +33,8 @@ local wipe = wipe
 
 local AbbreviateNumbers = AbbreviateNumbers
 local CreateFrame = CreateFrame
-local GetInspectSpecialization = GetInspectSpecialization
 local GetInventoryItemLink = GetInventoryItemLink
 local GetServerExpansionLevel = GetServerExpansionLevel
-local GetSpecializationInfoByID = GetSpecializationInfoByID
 local ItemLocation = ItemLocation
 local Mixin = Mixin
 local SetPortraitTexture = SetPortraitTexture
@@ -48,36 +46,39 @@ local UnitName = UnitName
 
 local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
 local C_Item = _G.C_Item
-local C_SpecializationInfo = _G.C_SpecializationInfo
 local C_TooltipInfo = _G.C_TooltipInfo
 local C_TradeSkillUI = _G.C_TradeSkillUI
-local C_Item_GetCurrentItemLevel = C_Item and C_Item.GetCurrentItemLevel or function() return nil end
-local C_Item_GetDetailedItemLevelInfo = C_Item and C_Item.GetDetailedItemLevelInfo or function() return nil end
-local C_Item_GetItemGem = C_Item and C_Item.GetItemGem or function() return nil end
-local C_Item_GetItemInfo = W.Compatibility.GetItemInfo
-local C_Item_GetItemNumSockets = C_Item and C_Item.GetItemNumSockets or function() return 0 end
-local C_Item_GetItemQualityColor = C_Item and C_Item.GetItemQualityColor or function() return 1, 1, 1 end
-local C_Item_GetItemStats = C_Item and C_Item.GetItemStats or function() return nil end
-local C_Item_IsCorruptedItem = C_Item and C_Item.IsCorruptedItem or function() return false end
-local C_SpecializationInfo_GetSpecialization = C_SpecializationInfo and C_SpecializationInfo.GetSpecialization or function() return nil end
-local C_SpecializationInfo_GetSpecializationInfo = C_SpecializationInfo and C_SpecializationInfo.GetSpecializationInfo or function() return nil end
-local C_TooltipInfo_GetHyperlink = C_TooltipInfo and C_TooltipInfo.GetHyperlink or function() return nil end
+local C_Item_GetCurrentItemLevel = W.Compatibility.GetCurrentItemLevel
+local C_Item_GetDetailedItemLevelInfo = W.Compatibility.GetDetailedItemLevelInfo
+local C_Item_GetItemGem = C_Item and C_Item.GetItemGem or GetItemGem
+local C_Item_GetItemInfo = W.Compatibility.GetItemInfo or GetItemInfo
+local C_Item_GetItemNumSockets = W.Compatibility.GetItemNumSockets
+local C_Item_GetItemQualityColor = C_Item and C_Item.GetItemQualityColor or GetItemQualityColor
+local C_Item_GetItemStats = C_Item and C_Item.GetItemStats or GetItemStats
+local C_Item_IsCorruptedItem = W.Compatibility.IsCorruptedItem
+local C_TooltipInfo_GetHyperlink = C_TooltipInfo and C_TooltipInfo.GetHyperlink
+-- Reagent/crafted quality tiers are retail (Cata+) TradeSkill features absent on
+-- 3.3.5a; nil-safe fallbacks let the `... or ...` expressions yield nil on Wrath.
 local C_TradeSkillUI_GetItemCraftedQualityByItemInfo = C_TradeSkillUI and C_TradeSkillUI.GetItemCraftedQualityByItemInfo or function() return nil end
 local C_TradeSkillUI_GetItemReagentQualityByItemInfo = C_TradeSkillUI and C_TradeSkillUI.GetItemReagentQualityByItemInfo or function() return nil end
-local ChatFrameUtil_ActivateChat = ChatFrameUtil.ActivateChat
-local ChatFrameUtil_ChooseBoxForSend = ChatFrameUtil.ChooseBoxForSend
-local ChatFrameUtil_InsertLink = ChatFrameUtil.InsertLink
+local ChatFrameUtil = _G.ChatFrameUtil
+local ChatFrameUtil_ActivateChat = ChatEdit_ActivateChat
+local ChatFrameUtil_ChooseBoxForSend = ChatEdit_ChooseBoxForSend
+local ChatFrameUtil_InsertLink = ChatEdit_InsertLink
 
-local EMPTY = EMPTY
-local Enum_ItemClass = Enum.ItemClass
-local Enum_ItemQuality = Enum.ItemQuality
+local EMPTY = EMPTY or ""
+local Enum_ItemClass = _G.Enum and _G.Enum.ItemClass or {}
+local Enum_ItemQuality = _G.Enum and _G.Enum.ItemQuality or {}
 local INVSLOT_MAINHAND = INVSLOT_MAINHAND
 local INVSLOT_NECK = INVSLOT_NECK
 local INVSLOT_OFFHAND = INVSLOT_OFFHAND
 
 local MISSING_ICON = "Interface\\Cursor\\Quest"
 local CIRCLE_MASK = "Interface\\FriendsFrame\\Battlenet-Portrait"
-local CURRENT_EXPANSION_ID = GetServerExpansionLevel()
+local GetServerExpansionLevel = GetServerExpansionLevel or function()
+	return 3
+end
+local CURRENT_EXPANSION_ID = GetServerExpansionLevel() or 3
 local LABEL_COLOR = C.GetRGBFromTemplate("cyan-300")
 local PANEL_MIN_WIDTH = 250
 local PANEL_COMPONENT_SPACING = 4
@@ -88,12 +89,13 @@ local SECRET_VALUE_WIDTH = 80
 local ITEM_LEVEL_CHECK_INTERVAL = 0.08
 local INSPECT_WAIT_MAX_SECONDS = 3
 local INSPECT_WAIT_MAX_ROUNDS = floor(INSPECT_WAIT_MAX_SECONDS / ITEM_LEVEL_CHECK_INTERVAL)
-local PVP_ITEM_LEVEL_PATTERN = gsub(_G.PVP_ITEM_LEVEL_TOOLTIP, "%%d", "(%%d+)")
+local PVP_ITEM_LEVEL_TOOLTIP = _G.PVP_ITEM_LEVEL_TOOLTIP or "PvP item level %d"
+local PVP_ITEM_LEVEL_PATTERN = gsub(PVP_ITEM_LEVEL_TOOLTIP, "%%d", "(%%d+)")
 
-local RETRIEVING_ITEM_INFO = RETRIEVING_ITEM_INFO
-local ITEM_LEVEL = ITEM_LEVEL
-local ITEM_LEVEL_ALT = ITEM_LEVEL_ALT
-local ITEM_MIN_LEVEL = ITEM_MIN_LEVEL
+local RETRIEVING_ITEM_INFO = RETRIEVING_ITEM_INFO or "Retrieving item information"
+local ITEM_LEVEL = ITEM_LEVEL or "Item Level %d"
+local ITEM_LEVEL_ALT = ITEM_LEVEL_ALT or "Item Level %d (%d)"
+local ITEM_MIN_LEVEL = ITEM_MIN_LEVEL or "Requires level %d"
 
 local MATCH_ITEM_LEVEL = ITEM_LEVEL:gsub("%%d", "(%%d+)")
 local MATCH_MIN_LEVEL = ITEM_MIN_LEVEL:gsub("%%d", "(%%d+)")
@@ -341,7 +343,9 @@ end
 ---@param craftingTier number? The crafting quality level for the overlay
 function circleIconPrototype:UpdateStyle(texture, quality, colorTemplate, craftingTier)
 	self.Texture:SetTexture(texture)
-	self.Texture:SetMask(CIRCLE_MASK)
+	if self.Texture.SetMask and CIRCLE_MASK then
+		self.Texture:SetMask(CIRCLE_MASK)
+	end
 
 	if texture == MISSING_ICON then
 		self.Texture:SetRotation(-math_pi / 18)
@@ -386,7 +390,11 @@ function circleIconPool:CreateIcon()
 
 	frame.Texture = frame:CreateTexture(nil, "ARTWORK")
 	frame.Texture:Point("CENTER")
-	frame.Texture:SetMask(CIRCLE_MASK)
+	-- CIRCLE_MASK / SetMask are retail (Cata+) APIs absent on the 3.3.5a fork;
+	-- guard so the inspect icon doesn't crash (icon renders square here).
+	if frame.Texture.SetMask and CIRCLE_MASK then
+		frame.Texture:SetMask(CIRCLE_MASK)
+	end
 
 	frame.CraftingTierText = frame:CreateFontString(nil, "OVERLAY")
 	frame.CraftingTierText:Point("CENTER", frame.Texture, "BOTTOM")
@@ -653,12 +661,20 @@ end
 
 local function GetUnitSpecializationInfo(unit)
 	if unit == "player" then
-		local _, name, _, icon = C_SpecializationInfo_GetSpecializationInfo(C_SpecializationInfo_GetSpecialization())
-		return { icon = icon, name = name }
+		local specIndex = W.Compatibility.GetSpecialization()
+		if specIndex then
+			local _, name, _, icon = W.Compatibility.GetSpecializationInfo(specIndex)
+			return { icon = icon, name = name }
+		end
+		return nil
 	end
 
-	local _, name, _, icon = GetSpecializationInfoByID(GetInspectSpecialization(unit))
-	return { icon = icon, name = name }
+	local specID = W.Compatibility.GetInspectSpecialization(unit)
+	if specID then
+		local _, name, _, icon = W.Compatibility.GetSpecializationInfoByID(specID)
+		return { icon = icon, name = name }
+	end
+	return nil
 end
 
 ---@class EquipmentStats
@@ -791,7 +807,7 @@ function I:CreatePanel(parent)
 	S:CreateShadowModule(frame)
 	S:MerathilisUISkin(frame)
 
-	frame.CloseButton = CreateFrame("Button", nil, frame, "UIPanelCloseButton, BackdropTemplate") --[[@as Button]]
+	frame.CloseButton = CreateFrame("Button", nil, frame, "UIPanelCloseButton") --[[@as Button]]
 	frame.CloseButton:Point("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
 	S:Proxy("HandleCloseButton", frame.CloseButton)
 	frame.CloseButton:SetScript("OnClick", function(_)
@@ -804,16 +820,29 @@ function I:CreatePanel(parent)
 
 	MF:InternalHandle(frame, MF:GetMoveTarget(parent) or parent)
 
-	-- Portrait
-	frame.PortraitFrame = CreateFrame("Frame", nil, frame, "GarrisonFollowerPortraitTemplate") --[[@as GarrisonFollowerPortraitMixin]]
+	-- Portrait (GarrisonFollowerPortraitTemplate is retail-only; build a
+	-- native Wrath portrait with the same shape: Portrait texture + Level text)
+	frame.PortraitFrame = CreateFrame("Frame", nil, frame)
+	frame.PortraitFrame:Size(56, 56)
 	frame.PortraitFrame:StripTextures()
 	frame.PortraitFrame:Point("TOPLEFT", frame, "TOPLEFT", 16, -12)
 	frame.PortraitFrame:SetScale(0.9)
 
+	frame.PortraitFrame.Portrait = frame.PortraitFrame:CreateTexture(nil, "ARTWORK")
+	frame.PortraitFrame.Portrait:SetAllPoints(frame.PortraitFrame)
+	frame.PortraitFrame.Portrait:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+	frame.PortraitFrame.Level = frame.PortraitFrame:CreateFontString(nil, "OVERLAY")
 	F.SetFont(frame.PortraitFrame.Level, F.GetCompatibleFont("Chivo Mono"), 18)
 	frame.PortraitFrame.Level:ClearAllPoints()
 	frame.PortraitFrame.Level:Point("BOTTOMRIGHT", frame.PortraitFrame, "BOTTOMRIGHT")
+
+	frame.PortraitFrame.LevelBorder = frame.PortraitFrame:CreateTexture(nil, "OVERLAY")
 	frame.PortraitFrame.LevelBorder:SetAlpha(0)
+
+	function frame.PortraitFrame:SetLevel(level)
+		self.Level:SetText(level)
+	end
 
 	frame.PortraitBorder = frame:CreateTexture(nil, "BORDER")
 	frame.PortraitBorder:SetTexture(W.Media.Textures.round)
@@ -836,17 +865,20 @@ function I:CreatePanel(parent)
 	frame.SpecIcon:SetShown(false)
 	frame.SpecIcon:CreateBackdrop()
 
-	frame.SpecIcon:SetScript("OnEnter", function()
-		if frame.specName and frame.specName ~= "" then
-			_G.GameTooltip:SetOwner(frame, "ANCHOR_CURSOR", 0, 0)
-			_G.GameTooltip:SetText(frame.specName, 1, 1, 1)
-			_G.GameTooltip:Show()
-		end
-	end)
+	-- Textures have no SetScript on 3.3.5a (retail-only); the spec tooltip is skipped there.
+	if frame.SpecIcon.SetScript then
+		frame.SpecIcon:SetScript("OnEnter", function()
+			if frame.specName and frame.specName ~= "" then
+				_G.GameTooltip:SetOwner(frame, "ANCHOR_CURSOR", 0, 0)
+				_G.GameTooltip:SetText(frame.specName, 1, 1, 1)
+				_G.GameTooltip:Show()
+			end
+		end)
 
-	frame.SpecIcon:SetScript("OnLeave", function()
-		_G.GameTooltip:Hide()
-	end)
+		frame.SpecIcon:SetScript("OnLeave", function()
+			_G.GameTooltip:Hide()
+		end)
+	end
 
 	-- Lines
 	local parentHeight = parent:GetHeight()
@@ -857,7 +889,7 @@ function I:CreatePanel(parent)
 
 	for displayIndex, slotInfo in ipairs(DISPLAY_SLOTS) do
 		-- Line
-		local line = CreateFrame("Button", nil, frame, "BackdropTemplate")
+		local line = CreateFrame("Button", nil, frame)
 		line:Size(160, frame.lineHeight)
 		line.index = slotInfo.index
 		if displayIndex == 1 then
@@ -868,7 +900,7 @@ function I:CreatePanel(parent)
 		frame.Lines[displayIndex] = line
 
 		-- Label
-		line.Label = CreateFrame("Frame", nil, line, "BackdropTemplate")
+		line.Label = CreateFrame("Frame", nil, line)
 		line.Label:Size(38, 18)
 		line.Label:Point("LEFT")
 		line.Label:SetTemplate()
@@ -891,7 +923,7 @@ function I:CreatePanel(parent)
 		line.ItemLevel:SetJustifyH("CENTER")
 
 		-- Item Texture
-		line.ItemTextureFrame = CreateFrame("Frame", nil, line, "BackdropTemplate")
+		line.ItemTextureFrame = CreateFrame("Frame", nil, line)
 		line.ItemTextureFrame.Texture = line.ItemTextureFrame:CreateTexture(nil, "ARTWORK")
 		line.ItemTextureFrame:Size(self.db.itemIcon.width, self.db.itemIcon.height)
 		line.ItemTextureFrame:Point("LEFT", line.ItemLevel, "RIGHT", PANEL_COMPONENT_SPACING, 0)
@@ -1160,7 +1192,7 @@ function I:CreateStatsComparePanel(parent)
 
 	for groupIndex, group in ipairs(STATS_CONFIG.groups) do
 		for _, def in ipairs(group.rows) do
-			local row = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+			local row = CreateFrame("Frame", nil, frame)
 			row:Height(STAT_ROW_HEIGHT)
 
 			if not def.isHeader then

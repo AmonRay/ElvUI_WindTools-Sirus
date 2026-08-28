@@ -37,28 +37,60 @@ local C_TransmogCollection = _G.C_TransmogCollection
 local C_TransmogSets = _G.C_TransmogSets
 local C_Transmog = _G.C_Transmog
 local C_Item_GetItemInfoInstant = W.Compatibility.GetItemInfoInstant
-local C_Item_GetItemInventoryTypeByID = C_Item and C_Item.GetItemInventoryTypeByID or function() return nil end
-local C_Item_GetItemLearnTransmogSet = C_Item and C_Item.GetItemLearnTransmogSet or function() return nil end
-local C_Item_IsCosmeticItem = C_Item and C_Item.IsCosmeticItem or function() return false end
-local C_MerchantFrame_GetItemInfo = C_MerchantFrame and C_MerchantFrame.GetItemInfo or function() return nil end
-local C_MountJournal_GetMountFromItem = C_MountJournal and C_MountJournal.GetMountFromItem or function() return nil end
-local C_MountJournal_GetMountInfoByID = C_MountJournal and C_MountJournal.GetMountInfoByID or function() return nil end
-local C_PetJournal_GetNumCollectedInfo = C_PetJournal and C_PetJournal.GetNumCollectedInfo or function() return nil end
-local C_PetJournal_GetPetInfoByItemID = C_PetJournal and C_PetJournal.GetPetInfoByItemID or function() return nil end
-local C_TooltipInfo_GetGuildBankItem = C_TooltipInfo and C_TooltipInfo.GetGuildBankItem or function() return nil end
-local C_TooltipInfo_GetHyperlink = C_TooltipInfo and C_TooltipInfo.GetHyperlink or function() return nil end
-local C_ToyBox_GetToyInfo = C_ToyBox and C_ToyBox.GetToyInfo or function() return nil end
-local C_TransmogCollection_PlayerHasTransmogByItemInfo = C_TransmogCollection and C_TransmogCollection.PlayerHasTransmogByItemInfo or function() return false end
-local C_TransmogSets_GetSetInfo = C_TransmogSets and C_TransmogSets.GetSetInfo or function() return nil end
-local C_Transmog_GetAllSetAppearancesByID = C_Transmog and C_Transmog.GetAllSetAppearancesByID or function() return nil end
+local C_Item_GetItemInventoryTypeByID = C_Item and C_Item.GetItemInventoryTypeByID
+local function GetItemInventoryType(itemID)
+	if C_Item_GetItemInventoryTypeByID then return C_Item_GetItemInventoryTypeByID(itemID) end
+	return select(9, GetItemInfo(itemID))
+end
+local C_Item_GetItemLearnTransmogSet = C_Item and C_Item.GetItemLearnTransmogSet
+local C_Item_IsCosmeticItem = W.Compatibility.IsCosmeticItem
+local C_Heirloom = _G.C_Heirloom
+local C_Heirloom_IsItemHeirloom = C_Heirloom and C_Heirloom.IsItemHeirloom
+local C_Heirloom_PlayerHasHeirloom = C_Heirloom and C_Heirloom.PlayerHasHeirloom
+local C_MerchantFrame_GetItemInfo = C_MerchantFrame and C_MerchantFrame.GetItemInfo
+local C_MountJournal_IsMountItem = C_MountJournal and C_MountJournal.IsMountItem
+local C_MountJournal_GetMountFromItem = C_MountJournal and C_MountJournal.GetMountFromItem
+local C_MountJournal_GetMountInfoByID = C_MountJournal and C_MountJournal.GetMountInfoByID
+local C_PetJournal_GetNumCollectedInfo = C_PetJournal and C_PetJournal.GetNumCollectedInfo
+local C_PetJournal_IsPetItem = C_PetJournal and C_PetJournal.IsPetItem
+local C_PetJournal_GetPetInfoByItemID = C_PetJournal and C_PetJournal.GetPetInfoByItemID
+local C_TooltipInfo_GetGuildBankItem = C_TooltipInfo and C_TooltipInfo.GetGuildBankItem
+local function GetGuildBankTooltipData(tab, index)
+	if C_TooltipInfo_GetGuildBankItem then return C_TooltipInfo_GetGuildBankItem(tab, index) end
+	if not GameTooltip or not GameTooltip.SetGuildBankItem then return nil end
+	GameTooltip:SetGuildBankItem(tab, index)
+	local lines = {}
+	for lineIndex = 1, GameTooltip:NumLines() do
+		local left = _G["GameTooltipTextLeft" .. lineIndex]
+		lines[lineIndex] = { leftText = left and left:GetText() }
+	end
+	return { lines = lines }
+end
+local C_TooltipInfo_GetHyperlink = C_TooltipInfo and C_TooltipInfo.GetHyperlink
+local function GetHyperlinkTooltipData(link)
+	if C_TooltipInfo_GetHyperlink then return C_TooltipInfo_GetHyperlink(link) end
+	if not GameTooltip or not GameTooltip.SetHyperlink then return nil end
+	GameTooltip:SetHyperlink(link)
+	local lines = {}
+	for i = 1, GameTooltip:NumLines() do
+		local left = _G["GameTooltipTextLeft" .. i]
+		lines[i] = { leftText = left and left:GetText() }
+	end
+	return { lines = lines }
+end
+local C_ToyBox_GetToyInfo = C_ToyBox and C_ToyBox.GetToyInfo
+local C_TransmogCollection_PlayerHasTransmogByItemInfo = C_TransmogCollection and C_TransmogCollection.PlayerHasTransmogByItemInfo
+local C_TransmogSets_GetSetInfo = C_TransmogSets and C_TransmogSets.GetSetInfo
+local C_Transmog_GetAllSetAppearancesByID = C_Transmog and C_Transmog.GetAllSetAppearancesByID
 
 local Enum_ItemClass = _G.Enum and _G.Enum.ItemClass or {}
 local Enum_InventoryType = _G.Enum and _G.Enum.InventoryType or {}
 local Enum_ItemClass_Battlepet = Enum_ItemClass.Battlepet
 local BUYBACK_ITEMS_PER_PAGE = BUYBACK_ITEMS_PER_PAGE
 local COLLECTED = COLLECTED
-local ITEM_SPELL_KNOWN = ITEM_SPELL_KNOWN
-local PET_SEARCH_PATTERN = strmatch(ITEM_PET_KNOWN, "[^%(（]+")
+local ITEM_SPELL_KNOWN = ITEM_SPELL_KNOWN or ""
+local ITEM_PET_KNOWN = ITEM_PET_KNOWN or ""
+local PET_SEARCH_PATTERN = strmatch(ITEM_PET_KNOWN, "[^%(（]+") or ITEM_PET_KNOWN
 local MAX_GUILDBANK_SLOTS_PER_TAB = 98
 local NUM_SLOTS_PER_GUILDBANK_GROUP = 14
 
@@ -80,22 +112,27 @@ local transmogInventoryTypes = {
 local knowns = {}
 
 local function IsPetCollected(speciesID)
-	local num = speciesID and C_PetJournal_GetNumCollectedInfo(speciesID)
-	return num and num > 0
+	if not speciesID then return false end
+	if C_PetJournal_GetNumCollectedInfo then
+		local num = C_PetJournal_GetNumCollectedInfo(speciesID)
+		return num and num > 0
+	end
+	return false
 end
 
 local function IsTransmogCollected(itemID)
 	if not C_Item_IsCosmeticItem(itemID) then
-		local inventoryType = C_Item_GetItemInventoryTypeByID(itemID)
+		local inventoryType = GetItemInventoryType(itemID)
 		if not transmogInventoryTypes[inventoryType] then
 			return false
 		end
 	end
 
-	return C_TransmogCollection_PlayerHasTransmogByItemInfo(itemID)
+	return C_TransmogCollection_PlayerHasTransmogByItemInfo and C_TransmogCollection_PlayerHasTransmogByItemInfo(itemID) or false
 end
 
 local function IsTransmogSetCollected(itemID)
+	if not C_Item_GetItemLearnTransmogSet or not C_TransmogSets_GetSetInfo or not C_Transmog_GetAllSetAppearancesByID or not C_TransmogCollection_PlayerHasTransmogByItemInfo then return false end
 	local setID = C_Item_GetItemLearnTransmogSet(itemID)
 	if not setID then
 		return false
@@ -121,15 +158,26 @@ local function IsTransmogSetCollected(itemID)
 end
 
 local function IsMountCollected(itemID)
+	if C_MountJournal_IsMountItem and not C_MountJournal_IsMountItem(itemID) then return false end
+	if not C_MountJournal_GetMountFromItem or not C_MountJournal_GetMountInfoByID then return false end
 	local mountID = C_MountJournal_GetMountFromItem(itemID)
-	return mountID and select(11, C_MountJournal_GetMountInfoByID(mountID))
+	if not mountID then return false end
+	return select(11, C_MountJournal_GetMountInfoByID(mountID)) or false
 end
 
 local function IsToyCollected(itemID)
-	return C_ToyBox_GetToyInfo(itemID) and PlayerHasToy(itemID)
+	if not PlayerHasToy then return false end
+	if C_ToyBox_GetToyInfo and not C_ToyBox_GetToyInfo(itemID) then return false end
+	return PlayerHasToy(itemID) and true or false
+end
+
+local function IsHeirloomCollected(itemID)
+	return C_Heirloom_IsItemHeirloom and C_Heirloom_PlayerHasHeirloom and C_Heirloom_IsItemHeirloom(itemID) and C_Heirloom_PlayerHasHeirloom(itemID) or false
 end
 
 local function IsPetItemCollected(itemID)
+	if C_PetJournal_IsPetItem and not C_PetJournal_IsPetItem(itemID) then return false end
+	if not C_PetJournal_GetPetInfoByItemID then return false end
 	local speciesID = select(13, C_PetJournal_GetPetInfoByItemID(itemID))
 	return speciesID and IsPetCollected(speciesID)
 end
@@ -148,7 +196,7 @@ local function IsKnown(link, index)
 		local classID = select(6, C_Item_GetItemInfoInstant(link))
 		if classID == Enum_ItemClass_Battlepet and index then
 			local tab = GetCurrentGuildBankTab() --[[@as number]]
-			local data = C_TooltipInfo_GetGuildBankItem(tab, index)
+			local data = GetGuildBankTooltipData(tab, index)
 			if data then
 				return data.battlePetSpeciesID and IsPetCollected(data.battlePetSpeciesID)
 			end
@@ -165,6 +213,7 @@ local function IsKnown(link, index)
 				IsMountCollected(linkID)
 				or IsToyCollected(linkID)
 				or IsPetItemCollected(linkID)
+				or IsHeirloomCollected(linkID)
 				or IsTransmogCollected(linkID)
 				or IsTransmogSetCollected(linkID)
 			then
@@ -173,7 +222,7 @@ local function IsKnown(link, index)
 			end
 
 			-- Final check via tooltip parsing
-			local data = C_TooltipInfo_GetHyperlink(link)
+			local data = GetHyperlinkTooltipData(link)
 			if data then
 				for _, line in ipairs(data.lines) do
 					local text = line.leftText
@@ -202,7 +251,11 @@ function AK:UpdateMerchantItemButton(button, _, _, _, skip)
 
 	local tex = texCache[button]
 	local index = button:GetID()
-	local info = C_MerchantFrame_GetItemInfo(index)
+	local info = C_MerchantFrame_GetItemInfo and C_MerchantFrame_GetItemInfo(index)
+	if not info then
+		local _, _, _, _, _, isUsable, numAvailable = GetMerchantItemInfo(index)
+		info = { isUsable = isUsable, numAvailable = numAvailable }
+	end
 	if info and info.isUsable and IsKnown(GetMerchantItemLink(index)) then
 		if self.db.mode == "MONOCHROME" then
 			tex:SetDesaturated(true)
@@ -211,7 +264,8 @@ function AK:UpdateMerchantItemButton(button, _, _, _, skip)
 			if info.numAvailable == 0 then
 				r, g, b = r * 0.5, g * 0.5, b * 0.5
 			end
-			button:SetItemButtonTextureVertexColor(0.9 * r, 0.9 * g, 0.9 * b, true)
+			-- 3.3.5a has no SetItemButtonTextureVertexColor button method; the global is the native API.
+			SetItemButtonTextureVertexColor(button, 0.9 * r, 0.9 * g, 0.9 * b)
 		end
 	else
 		tex:SetDesaturated(false)
@@ -234,7 +288,10 @@ function AK:Merchant()
 		local itemButtonTex = _G["MerchantItem" .. i .. "ItemButtonIconTexture"]
 		if itemButton and itemButtonTex and not self:IsHooked(itemButton, "SetItemButtonTextureVertexColor") then
 			texCache[itemButton] = itemButtonTex
-			self:SecureHook(itemButton, "SetItemButtonTextureVertexColor", "UpdateMerchantItemButton")
+			-- The button method is retail-only; on 3.3.5a only the global exists, so the hook is skipped.
+			if itemButton.SetItemButtonTextureVertexColor then
+				self:SecureHook(itemButton, "SetItemButtonTextureVertexColor", "UpdateMerchantItemButton")
+			end
 			self:UpdateMerchantItemButton(itemButton)
 		end
 	end
@@ -350,11 +407,17 @@ do
 	local numHooked = 0
 	function AK:ADDON_LOADED(event, addOnName)
 		if addOnName == "Blizzard_AuctionHouseUI" then
-			self:SecureHook(_G.AuctionHouseFrame.BrowseResultsFrame.ItemList.ScrollBox, "Update", "AuctionHouse")
-			numHooked = numHooked + 1
+			local scrollBox = _G.AuctionHouseFrame and _G.AuctionHouseFrame.BrowseResultsFrame and _G.AuctionHouseFrame.BrowseResultsFrame.ItemList and _G.AuctionHouseFrame.BrowseResultsFrame.ItemList.ScrollBox
+			if scrollBox and scrollBox.Update then
+				self:SecureHook(scrollBox, "Update", "AuctionHouse")
+				numHooked = numHooked + 1
+			end
 		elseif addOnName == "Blizzard_GuildBankUI" then
-			self:SecureHook(_G.GuildBankFrame, "Update", "GuildBank")
-			numHooked = numHooked + 1
+			-- The 3.3.5a fork may expose GuildBankFrame without the retail Update method.
+			if _G.GuildBankFrame and _G.GuildBankFrame.Update then
+				self:SecureHook(_G.GuildBankFrame, "Update", "GuildBank")
+				numHooked = numHooked + 1
+			end
 		end
 
 		if numHooked == 2 then

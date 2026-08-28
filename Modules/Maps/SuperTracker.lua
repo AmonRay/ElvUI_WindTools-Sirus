@@ -14,17 +14,40 @@ local tonumber = tonumber
 local type = type
 local unpack = unpack
 
-local UiMapPoint_CreateFromCoordinates = UiMapPoint and UiMapPoint.CreateFromCoordinates or function() return nil end
-
+local UiMapPoint_CreateFromCoordinates = UiMapPoint and UiMapPoint.CreateFromCoordinates
+local LegacyMapAPI = type(GetPlayerMapPosition) == "function" and type(SetMapToCurrentZone) == "function"
+local LegacyGetCurrentMapAreaID = GetCurrentMapAreaID
 local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
-local C_Map_CanSetUserWaypointOnMap = C_Map and C_Map.CanSetUserWaypointOnMap or function() return false end
-local C_Map_ClearUserWaypoint = C_Map and C_Map.ClearUserWaypoint or function() end
-local C_Map_GetBestMapForUnit = C_Map and C_Map.GetBestMapForUnit or function() return nil end
-local C_Map_GetMapInfo = C_Map and C_Map.GetMapInfo or function() return nil end
-local C_Map_HasUserWaypoint = C_Map and C_Map.HasUserWaypoint or function() return false end
-local C_Map_SetUserWaypoint = C_Map and C_Map.SetUserWaypoint or function() end
-local C_Navigation_GetDistance = C_Navigation and C_Navigation.GetDistance or function() return 0 end
-local C_SuperTrack_SetSuperTrackedUserWaypoint = C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint or function() end
+local C_Map_CanSetUserWaypointOnMap = C_Map and C_Map.CanSetUserWaypointOnMap
+local C_Map_ClearUserWaypoint = C_Map and C_Map.ClearUserWaypoint
+local C_Map_GetBestMapForUnit = C_Map and C_Map.GetBestMapForUnit
+local function GetBestMapForUnit(unit)
+	if C_Map_GetBestMapForUnit then
+		return C_Map_GetBestMapForUnit(unit)
+	end
+	if LegacyMapAPI and LegacyGetCurrentMapAreaID then
+		SetMapToCurrentZone()
+		return LegacyGetCurrentMapAreaID()
+	end
+end
+local C_Map_GetMapInfo = C_Map and C_Map.GetMapInfo
+local function GetMapInfoCompat(mapID)
+	if C_Map_GetMapInfo then return C_Map_GetMapInfo(mapID) end
+	if GetMapInfo then
+		local name = select(1, GetMapInfo(mapID))
+		return mapID and { mapID = mapID, name = name or tostring(mapID) }
+	end
+end
+local C_Map_HasUserWaypoint = C_Map and C_Map.HasUserWaypoint
+local C_Map_SetUserWaypoint = C_Map and C_Map.SetUserWaypoint
+local C_Navigation_GetDistance = C_Navigation and C_Navigation.GetDistance
+
+local function GetLegacyMapPosition(unit)
+	if not GetPlayerMapPosition or not SetMapToCurrentZone then return nil end
+	SetMapToCurrentZone()
+	return GetPlayerMapPosition(unit or "player")
+end
+local C_SuperTrack_SetSuperTrackedUserWaypoint = C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint
 
 function ST:ReskinDistanceText()
 	if not _G.SuperTrackedFrame or not _G.SuperTrackedFrame.DistanceText then
@@ -48,14 +71,17 @@ function ST:HookPin()
 		return
 	end
 
-	if _G.WorldMapFrame:GetNumActivePinsByTemplate("WaypointLocationPinTemplate") ~= 0 then
-		for pin in _G.WorldMapFrame:EnumeratePinsByTemplate("WaypointLocationPinTemplate") do
-			if not self:IsHooked(pin, "OnMouseClickAction") then
-				self:SecureHook(pin, "OnMouseClickAction", function(_, button)
-					if button == "MiddleButton" then
-						C_Map_ClearUserWaypoint()
-					end
-				end)
+	-- WaypointLocationPinTemplate / pin API is retail-only; absent on 3.3.5a
+	if _G.WorldMapFrame.GetNumActivePinsByTemplate then
+		if _G.WorldMapFrame:GetNumActivePinsByTemplate("WaypointLocationPinTemplate") ~= 0 then
+			for pin in _G.WorldMapFrame:EnumeratePinsByTemplate("WaypointLocationPinTemplate") do
+				if not self:IsHooked(pin, "OnMouseClickAction") then
+					self:SecureHook(pin, "OnMouseClickAction", function(_, button)
+						if button == "MiddleButton" then
+							if C_Map_ClearUserWaypoint then C_Map_ClearUserWaypoint() end
+						end
+					end)
+				end
 			end
 		end
 	end
@@ -142,7 +168,7 @@ function ST.commandHandler(msg, isPreview)
 	local mapID = strmatch(msg, "#(%d+)")
 	msg = gsub(msg, "#%d+", "")
 
-	mapID = mapID or _G.WorldMapFrame:IsShown() and _G.WorldMapFrame:GetMapID() or C_Map_GetBestMapForUnit("player")
+	mapID = mapID or _G.WorldMapFrame:IsShown() and _G.WorldMapFrame.GetMapID and _G.WorldMapFrame:GetMapID() or GetBestMapForUnit("player")
 
 	local numbers = {}
 	local words = { F.Strings.Split(msg .. " ", " ") }
@@ -188,10 +214,13 @@ function ST.commandHandler(msg, isPreview)
 			waypointString = waypointString .. ", " .. numbers[3]
 		end
 
-		local mapData = mapID and C_Map_GetMapInfo(mapID) ---@type UiMapDetails?
+		local mapData = mapID and GetMapInfoCompat(mapID) ---@type UiMapDetails?
+		if not mapData and LegacyMapAPI then
+			mapData = { name = GetRealZoneText and GetRealZoneText() or "Current zone" }
+		end
 		if not mapData then
 			local uiMapID = C_Map_GetBestMapForUnit("player")
-			mapData = uiMapID and C_Map_GetMapInfo(uiMapID) --[[@as UiMapDetails]]
+			mapData = uiMapID and GetMapInfoCompat(uiMapID) --[[@as UiMapDetails]]
 		end
 
 		return true, mapData.name .. " (" .. waypointString .. ")"
@@ -201,13 +230,30 @@ function ST.commandHandler(msg, isPreview)
 end
 
 function ST:SetWaypoint(mapID, x, y, z)
-	mapID = mapID or _G.WorldMapFrame:IsShown() and _G.WorldMapFrame:GetMapID() or C_Map_GetBestMapForUnit("player")
+	if LegacyMapAPI then
+		if x > 1 and y > 1 then x, y = x / 100, y / 100 end
+		if x <= 1 and y <= 1 then
+			if _G.TomTom and type(_G.TomTom.AddWaypoint) == "function" then
+				_G.TomTom:AddWaypoint(nil, x, y, { title = L["Waypoint"] })
+				return
+			end
+			if _G.WorldMapFrame and _G.WorldMapFrame.SetShown then
+				SetMapToCurrentZone()
+				if WorldMapPing_SetPosition then WorldMapPing_SetPosition(x, y) end
+			end
+		end
+		return
+	end
+	mapID = mapID or _G.WorldMapFrame:IsShown() and _G.WorldMapFrame.GetMapID and _G.WorldMapFrame:GetMapID() or GetBestMapForUnit("player")
 
 	-- colored waypoint string
-	local mapData = C_Map_GetMapInfo(mapID) ---@type UiMapDetails?
+	local mapData = GetMapInfoCompat(mapID) ---@type UiMapDetails?
+	if not mapData and mapID and GetMapInfo then
+		mapData = { mapID = mapID, name = select(1, GetMapInfo(mapID)) }
+	end
 	if not mapData then
-		mapID = C_Map_GetBestMapForUnit("player")
-		mapData = mapID and C_Map_GetMapInfo(mapID) --[[@as UiMapDetails]]
+		mapID = GetBestMapForUnit("player")
+		mapData = mapID and GetMapInfoCompat(mapID) --[[@as UiMapDetails]]
 	end
 	local mapName = mapData.name
 	local location = format("%s, %s", x, y)
@@ -228,7 +274,7 @@ function ST:SetWaypoint(mapID, x, y, z)
 		return
 	end
 
-	if C_Map_CanSetUserWaypointOnMap(mapID) then
+	if C_Map_CanSetUserWaypointOnMap and C_Map_SetUserWaypoint and UiMapPoint_CreateFromCoordinates and C_Map_CanSetUserWaypointOnMap(mapID) then
 		C_Map_SetUserWaypoint(UiMapPoint_CreateFromCoordinates(mapID, x, y, z))
 		F.Print(format(L["Waypoint %s has been set."], waypointString))
 	else
@@ -319,9 +365,11 @@ function ST:WaypointParse()
 end
 
 function ST:USER_WAYPOINT_UPDATED()
-	if C_Map_HasUserWaypoint() then
+	if C_Map_HasUserWaypoint and C_Map_HasUserWaypoint() then
 		if self.db and self.db.autoTrackWaypoint then
-			E:Delay(0.1, C_SuperTrack_SetSuperTrackedUserWaypoint, true)
+			if C_SuperTrack_SetSuperTrackedUserWaypoint then
+				E:Delay(0.1, C_SuperTrack_SetSuperTrackedUserWaypoint, true)
+			end
 		end
 		E:Delay(0.15, self.HookPin, self)
 	end

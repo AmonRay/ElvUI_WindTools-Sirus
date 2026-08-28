@@ -67,7 +67,7 @@ local C_Item_GetItemCooldown = W.Compatibility.GetItemCooldown
 local C_Item_GetItemCount = W.Compatibility.GetItemCount
 local C_SpellBook_IsSpellKnown = C_SpellBook and C_SpellBook.IsSpellKnown or IsSpellKnown or function() return false end
 local C_Spell_GetSpellCooldown = C_Spell and C_Spell.GetSpellCooldown or GetSpellCooldown or function() return 0, 0, 0 end
-local C_Timer_NewTicker = W.Compatibility.HasTimerAPI and C_Timer.NewTicker or function() return nil end
+local C_Timer_NewTicker = W.Compatibility.NewTicker
 local C_ToyBox_IsToyUsable = C_ToyBox and C_ToyBox.IsToyUsable or function() return false end
 local C_UI_Reload = W.Compatibility.ReloadUI
 
@@ -532,7 +532,14 @@ local ButtonTypes = {
 		icon = W.Media.Icons.barBags,
 		click = {
 			LeftButton = function()
-				_G.ToggleAllBags()
+				-- _G.ToggleAllBags is ElvUI's global that routes through Blizzard's
+				-- OpenAllBags and, depending on the client's bag state, opens the bag
+				-- frame without it becoming visible. ToggleBackpack is the standard
+				-- open (same as the B key) and is hooked by ElvUI in both states.
+				local toggle = _G.ToggleBackpack or _G.ToggleAllBags
+				if toggle then
+					toggle()
+				end
 			end,
 		},
 		tooltips = "Bags",
@@ -542,7 +549,9 @@ local ButtonTypes = {
 		icon = W.Media.Icons.barBlizzardShop,
 		click = {
 			LeftButton = function()
-				_G.StoreMicroButton:Click()
+				if _G.StoreMicroButton and _G.StoreMicroButton.Click then
+					_G.StoreMicroButton:Click()
+				end
 			end,
 		},
 		tooltips = {
@@ -570,7 +579,7 @@ local ButtonTypes = {
 		icon = W.Media.Icons.barCollections,
 		macro = {
 			LeftButton = "/click CollectionsJournalCloseButton\n/click CollectionsMicroButton\n/click CollectionsJournalTab1",
-			RightButton = "/run C_MountJournal.SummonByID(0)",
+			RightButton = "/run if C_MountJournal and C_MountJournal.SummonByID then C_MountJournal.SummonByID(0) end",
 		},
 		tooltips = {
 			L["Collections"],
@@ -583,8 +592,11 @@ local ButtonTypes = {
 		name = L["Encounter Journal"],
 		icon = W.Media.Icons.barEncounterJournal,
 		macro = {
-			LeftButton = "/click EJMicroButton",
-			RightButton = "/run WeeklyRewards_ShowUI()",
+			-- On this Sirus client there is no EJMicroButton (no micro buttons at all);
+			-- the encounter/adventure guide is opened via the ToggleEncounterJournalFrame()
+			-- global (UIParent.lua), which also hides Collections/Spellbook.
+			LeftButton = "/run ToggleEncounterJournalFrame()",
+			RightButton = "/run if WeeklyRewards_ShowUI then WeeklyRewards_ShowUI() end",
 		},
 		tooltips = {
 			LEFT_BUTTON_ICON .. " " .. L["Encounter Journal"],
@@ -595,7 +607,10 @@ local ButtonTypes = {
 		name = L["Friend List"],
 		icon = W.Media.Icons.barFriends,
 		macro = {
-			LeftButton = "/cleartarget\n/friends",
+			-- On this Sirus client /friends (SlashCmdList["FRIENDS"]) with an empty
+			-- message + cleared target toggles the wrong panel instead of the friend
+			-- list; the global ToggleFriendsFrame is the reliable open (as MicroMenu uses).
+			LeftButton = "/run ToggleFriendsFrame(1)",
 		},
 		additionalText = function()
 			local numBNOnline, numWoWOnline = 0, 0
@@ -742,10 +757,12 @@ local ButtonTypes = {
 				_G.UIErrorsFrame:AddMessage(L["House data cannot be updated in combat."], RED_FONT_COLOR:GetRGBA())
 			end,
 			RightButton = function()
-				if not InCombatLockdown() then
-					_G.HousingFramesUtil.ToggleHousingDashboard()
-				else
-					_G.UIErrorsFrame:AddMessage(_G.ERR_NOT_IN_COMBAT, RED_FONT_COLOR:GetRGBA())
+				if _G.HousingFramesUtil and _G.HousingFramesUtil.ToggleHousingDashboard then
+					if not InCombatLockdown() then
+						_G.HousingFramesUtil.ToggleHousingDashboard()
+					else
+						_G.UIErrorsFrame:AddMessage(_G.ERR_NOT_IN_COMBAT, RED_FONT_COLOR:GetRGBA())
+					end
 				end
 			end,
 		},
@@ -779,7 +796,7 @@ local ButtonTypes = {
 		icon = W.Media.Icons.barPetJournal,
 		macro = {
 			LeftButton = "/click CollectionsJournalCloseButton\n/click CollectionsMicroButton\n/click CollectionsJournalTab2",
-			RightButton = "/run C_PetJournal.SummonRandomPet(C_PetJournal.HasFavoritePets());",
+			RightButton = "/run if C_PetJournal and C_PetJournal.SummonRandomPet then C_PetJournal.SummonRandomPet(C_PetJournal.HasFavoritePets()) end",
 		},
 		tooltips = {
 			L["Pet Journal"],
@@ -831,7 +848,11 @@ local ButtonTypes = {
 		click = {
 			LeftButton = function()
 				if not InCombatLockdown() then
-					_G.PlayerSpellsUtil.ToggleSpellBookFrame()
+					if _G.PlayerSpellsUtil and _G.PlayerSpellsUtil.ToggleSpellBookFrame then
+						_G.PlayerSpellsUtil.ToggleSpellBookFrame()
+					else
+						_G.ToggleSpellBook(_G.BOOKTYPE_SPELL)
+					end
 				else
 					_G.UIErrorsFrame:AddMessage(_G.ERR_NOT_IN_COMBAT, RED_FONT_COLOR:GetRGBA())
 				end
@@ -847,7 +868,11 @@ local ButtonTypes = {
 		click = {
 			LeftButton = function()
 				if not InCombatLockdown() then
-					_G.PlayerSpellsUtil.ToggleClassTalentFrame()
+					if _G.PlayerSpellsUtil and _G.PlayerSpellsUtil.ToggleClassTalentFrame then
+						_G.PlayerSpellsUtil.ToggleClassTalentFrame()
+					else
+						_G.ToggleTalentFrame()
+					end
 				else
 					_G.UIErrorsFrame:AddMessage(_G.ERR_NOT_IN_COMBAT, RED_FONT_COLOR:GetRGBA())
 				end
@@ -861,7 +886,9 @@ local ButtonTypes = {
 		name = L["Toy Box"],
 		icon = W.Media.Icons.barToyBox,
 		macro = {
-			LeftButton = "/click CollectionsJournalCloseButton\n/click CollectionsMicroButton\n/click CollectionsJournalTab3",
+			-- This client's CollectionsJournal has 5 tabs: 1=Mounts, 2=Pets, 3=Wardrobe
+			-- (Appearances/Модели), 4=ToyBox, 5=Heirlooms. Toys are tab 4, not 3.
+			LeftButton = "/click CollectionsJournalCloseButton\n/click CollectionsMicroButton\n/click CollectionsJournalTab4",
 		},
 		tooltips = {
 			L["Toy Box"],
@@ -1008,7 +1035,19 @@ function GB:UpdateBar()
 		self.bar:SetAlpha(1)
 	end
 
-	RegisterStateDriver(self.bar, "visibility", self.db.visibility)
+	-- 3.3.5a has no pet battles, so [petbattle] is not a valid condition and
+	-- the state driver would never reveal the bar. Strip it so the visibility
+	-- always evaluates to a known condition ("show" if nothing remains).
+	local visibility = self.db and self.db.visibility
+	if visibility then
+		visibility = gsub(visibility, "%[petbattle%][^;]-;?", "")
+		visibility = gsub(visibility, "^%s+", "")
+		if visibility == "" then
+			visibility = "show"
+		end
+	end
+
+	RegisterStateDriver(self.bar, "visibility", visibility or "show")
 end
 
 function GB:ConstructTimeArea()
@@ -1070,7 +1109,11 @@ function GB:ConstructTimeArea()
 		if self.db.tooltipsAnchor == "ANCHOR_TOP" then
 			DT.tooltip:SetOwner(panel, "ANCHOR_TOP", 0, 10)
 		else
-			DT.tooltip:SetOwner(panel.text, "ANCHOR_BOTTOM", 0, -10)
+			-- FontStrings are not valid SetOwner owners on 3.3.5a (expected frame); fall back to the panel.
+			local ok = pcall(DT.tooltip.SetOwner, DT.tooltip, panel.text, "ANCHOR_BOTTOM", 0, -10)
+			if not ok then
+				DT.tooltip:SetOwner(panel, "ANCHOR_BOTTOM", 0, -10)
+			end
 		end
 
 		if IsModifierKeyDown() then
@@ -1112,7 +1155,10 @@ function GB:ConstructTimeArea()
 
 		DT.RegisteredDataTexts["System"].onLeave()
 		DT.tooltip:Hide()
-		self.tooltipTimer:Cancel()
+		if self.tooltipTimer then
+			self.tooltipTimer:Cancel()
+			self.tooltipTimer = nil
+		end
 	end)
 
 	self.bar.middlePanel:SetScript("OnClick", function(_, mouseButton)
@@ -1143,7 +1189,9 @@ function GB:ConstructTimeArea()
 end
 
 function GB:UpdateTimeTicker()
-	self.timeAreaUpdateTimer:Cancel()
+	if self.timeAreaUpdateTimer then
+		self.timeAreaUpdateTimer:Cancel()
+	end
 	self.timeAreaUpdateTimer = C_Timer_NewTicker(self.db.time.interval, function()
 		GB:UpdateTime()
 	end)
@@ -1342,36 +1390,84 @@ function GB:UpdateButton(button, buttonType)
 	button.tooltips = config.tooltips
 	button.tooltipsLeave = config.tooltipsLeave
 
-	button:ClearAttributes()
+	-- SecureActionButton attributes (SetAttribute/ClearAttributes/GetAttribute) are a
+	-- Cataclysm+ API; this client implements SetAttribute but not ClearAttributes,
+	-- so each method is guarded separately. Without SetAttribute, buttons fall back
+	-- to a plain OnClick handler.
+	local secure = button.SetAttribute ~= nil
+	if secure then
+		if button.ClearAttributes then
+			button:ClearAttributes()
+		end
+	else
+		button:SetScript("OnClick", nil)
+	end
 
 	-- Click
 	if buttonType == "HEARTHSTONE" then
-		button:SetAttribute("type*", "macro")
 		for _, side in ipairs({ "left", "middle", "right" }) do
 			self:UpdateHearthstoneButtonMacro(button, side)
 		end
+		if secure then
+			button:SetAttribute("type*", "macro")
+		else
+			button:SetScript("OnClick", function(_, mouseButton)
+				local side = "left"
+				if mouseButton == "RightButton" then
+					side = "right"
+				elseif mouseButton == "MiddleButton" then
+					side = "middle"
+				end
+				local macro = button["hearthstoneMacro" .. side]
+				if macro and macro ~= "" then
+					RunMacroText(macro)
+				end
+			end)
+		end
 		tinsert(self.HearthstoneButtons, button)
 	elseif config.macro then
-		button:SetAttribute("type*", "macro")
-		button:SetAttribute("macrotext1", config.macro.LeftButton or "")
-		button:SetAttribute("macrotext2", config.macro.RightButton or config.macro.LeftButton or "")
-		button:SetAttribute("macrotext3", "")
-	elseif config.click then
-		button.Click = function(_, mouseButton)
-			local func = mouseButton and config.click[mouseButton] or config.click.LeftButton
-			func(GB.bar.middlePanel)
+		if secure then
+			button:SetAttribute("type*", "macro")
+			button:SetAttribute("macrotext1", config.macro.LeftButton or "")
+			button:SetAttribute("macrotext2", config.macro.RightButton or config.macro.LeftButton or "")
+			button:SetAttribute("macrotext3", "")
+		else
+			button:SetScript("OnClick", function(_, mouseButton)
+				RunMacroText(config.macro[mouseButton] or config.macro.LeftButton or "")
+			end)
 		end
-		button:SetAttribute("type*", "click")
-		button:SetAttribute("clickbutton", button)
+	elseif config.click then
+		if secure then
+			button.Click = function(_, mouseButton)
+				local func = mouseButton and config.click[mouseButton] or config.click.LeftButton
+				func(GB.bar.middlePanel)
+			end
+			button:SetAttribute("type*", "click")
+			button:SetAttribute("clickbutton", button)
 
-		if buttonType == "HOME" then
-			button:SetAttribute("type1", "teleporthome")
-			button:SetAttribute("type2", "click")
+			if buttonType == "HOME" then
+				button:SetAttribute("type1", "teleporthome")
+				button:SetAttribute("type2", "click")
+			end
+		else
+			button:SetScript("OnClick", function(_, mouseButton)
+				local func = mouseButton and config.click[mouseButton] or config.click.LeftButton
+				func(GB.bar.middlePanel)
+			end)
 		end
 	elseif config.item then
-		button:SetAttribute("type*", "item")
-		button:SetAttribute("item1", config.item.item1 or "")
-		button:SetAttribute("item2", config.item.item2 or "")
+		if secure then
+			button:SetAttribute("type*", "item")
+			button:SetAttribute("item1", config.item.item1 or "")
+			button:SetAttribute("item2", config.item.item2 or "")
+		else
+			button:SetScript("OnClick", function(_, mouseButton)
+				local item = mouseButton == "RightButton" and config.item.item2 or config.item.item1
+				if item and item ~= "" then
+					UseItemByName(item)
+				end
+			end)
+		end
 	end
 
 	-- Normal
@@ -1466,7 +1562,7 @@ function GB:UpdateHouseAttributes(button)
 	end
 
 	local house = GB.playerHouseList[1]
-	if house.neighborhoodGUID and house.houseGUID and house.plotID then
+	if house.neighborhoodGUID and house.houseGUID and house.plotID and button.SetAttribute then
 		button:SetAttribute("house-neighborhood-guid", house.neighborhoodGUID)
 		button:SetAttribute("house-guid", house.houseGUID)
 		button:SetAttribute("house-plot-id", house.plotID)
@@ -1572,7 +1668,7 @@ end
 function GB:PLAYER_REGEN_ENABLED()
 	for i = 1, 2 * NUM_PANEL_BUTTONS do
 		local button = self.buttons[i]
-		if button.type == "HOME" then
+		if button.type == "HOME" and button.SetAttribute then
 			button:SetAttribute("type1", "teleporthome")
 		end
 	end
@@ -1582,8 +1678,8 @@ function GB:PLAYER_REGEN_DISABLED()
 	for i = 1, 2 * NUM_PANEL_BUTTONS do
 		local button = self.buttons[i]
 
-		if button.type == "HOME" then
-			if not button:GetAttribute("house-guid") then
+		if button.type == "HOME" and button.SetAttribute then
+			if not button.GetAttribute or not button:GetAttribute("house-guid") then
 				button:SetAttribute("type1", "click")
 			end
 		end
@@ -1647,7 +1743,11 @@ function GB:Initialize()
 	self:RegisterEvent("COVENANT_CHOSEN", "UpdateHearthStoneTable")
 	self:RegisterEvent("PLAYER_HOUSE_LIST_UPDATED")
 	C_Housing_GetPlayerOwnedHouses()
-	self:SecureHook(_G.GuildMicroButton, "UpdateNotificationIcon", "UpdateGuildButton")
+	-- GuildMicroButton has no UpdateNotificationIcon mixin method on 3.3.5a;
+	-- UpdateGuildButton still refreshes on profile updates.
+	if _G.GuildMicroButton and _G.GuildMicroButton.UpdateNotificationIcon then
+		self:SecureHook(_G.GuildMicroButton, "UpdateNotificationIcon", "UpdateGuildButton")
+	end
 	self.initialized = true
 end
 
@@ -1774,7 +1874,12 @@ function GB:UpdateHearthstoneButtonMacro(button, mouseButton)
 		macro = format("/use item:%d", actionData.actionID)
 	end
 
-	button:SetAttribute(attribute, macro)
+	if button.SetAttribute then
+		button:SetAttribute(attribute, macro)
+	else
+		-- 3.3.5a has no SetAttribute: store the macro for the OnClick fallback.
+		button["hearthstoneMacro" .. side] = macro
+	end
 end
 
 function GB:UpdateHearthstoneButton()

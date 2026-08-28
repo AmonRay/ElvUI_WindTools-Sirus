@@ -90,10 +90,26 @@ function T:InitializeTierSet()
 		return
 	end
 
-	self:Hook(ET, "INSPECT_READY", ResetCache, true)
-	self:Hook(ET, "PopulateInspectGUIDCache", "ElvUITooltipPopulateInspectGUIDCache")
-	self:SecureHook(E.ScanTooltip, "SetInventoryItem", "ElvUIScanTooltipSetInventoryItem")
+	-- ET (ElvUI Tooltip) lacks the INSPECT_READY handler and PopulateInspectGUIDCache
+	-- method on the 3.3.5a fork; hook them only when actually present.
+	if ET and type(ET.INSPECT_READY) == "function" then
+		self:Hook(ET, "INSPECT_READY", ResetCache, true)
+	end
+	if ET and type(ET.PopulateInspectGUIDCache) == "function" then
+		self:Hook(ET, "PopulateInspectGUIDCache", "ElvUITooltipPopulateInspectGUIDCache")
+	end
+	-- E.ScanTooltip:SetInventoryItem may not exist on the 3.3.5a ElvUI fork
+	if E.ScanTooltip and type(E.ScanTooltip.SetInventoryItem) == "function" then
+		self:SecureHook(E.ScanTooltip, "SetInventoryItem", "ElvUIScanTooltipSetInventoryItem")
+	end
 	self:AddInspectInfoCallback(1, "TierSet", true)
 end
 
-T:AddCallback("InitializeTierSet")
+if T.AddCallback then
+	T:AddCallback("InitializeTierSet")
+elseif not T.__windtoolsCoreMissingWarned then
+	T.__windtoolsCoreMissingWarned = true
+	F.Developer.ThrowError(
+		"Tooltips TierSet was skipped: Modules/Tooltips/Core.lua did not load (T:AddCallback is missing), so tooltip callbacks were not registered. Reinstall ElvUI_WindTools with a complete copy of all files, then /reload."
+	)
+end

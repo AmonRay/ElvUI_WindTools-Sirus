@@ -50,25 +50,44 @@ local UnitIsDeadOrGhost = UnitIsDeadOrGhost
 local UnitName = UnitName
 local UnitPlayerControlled = UnitPlayerControlled
 
-local C_GossipInfo_GetActiveDelveGossip = C_GossipInfo and C_GossipInfo.GetActiveDelveGossip or function() return nil end
-local C_GossipInfo_GetActiveQuests = C_GossipInfo and C_GossipInfo.GetActiveQuests or function() return {} end
-local C_GossipInfo_GetAvailableQuests = C_GossipInfo and C_GossipInfo.GetAvailableQuests or function() return {} end
-local C_GossipInfo_GetNumActiveQuests = C_GossipInfo and C_GossipInfo.GetNumActiveQuests or function() return 0 end
-local C_GossipInfo_GetNumAvailableQuests = C_GossipInfo and C_GossipInfo.GetNumAvailableQuests or function() return 0 end
-local C_GossipInfo_GetOptions = C_GossipInfo and C_GossipInfo.GetOptions or function() return {} end
-local C_GossipInfo_SelectActiveQuest = C_GossipInfo and C_GossipInfo.SelectActiveQuest or SelectActiveQuest or function() end
-local C_GossipInfo_SelectAvailableQuest = C_GossipInfo and C_GossipInfo.SelectAvailableQuest or SelectAvailableQuest or function() end
-local C_GossipInfo_SelectOption = C_GossipInfo and C_GossipInfo.SelectOption or SelectGossipOption or function() end
+local C_GossipInfo_GetActiveDelveGossip = C_GossipInfo and C_GossipInfo.GetActiveDelveGossip
+local C_GossipInfo_GetActiveQuests = C_GossipInfo and C_GossipInfo.GetActiveQuests
+local C_GossipInfo_GetAvailableQuests = C_GossipInfo and C_GossipInfo.GetAvailableQuests
+local C_GossipInfo_GetNumActiveQuests = C_GossipInfo and C_GossipInfo.GetNumActiveQuests
+local C_GossipInfo_GetNumAvailableQuests = C_GossipInfo and C_GossipInfo.GetNumAvailableQuests
+local C_GossipInfo_GetOptions = C_GossipInfo and C_GossipInfo.GetOptions
+local C_GossipInfo_SelectActiveQuest = C_GossipInfo and C_GossipInfo.SelectActiveQuest or SelectActiveQuest
+local C_GossipInfo_SelectAvailableQuest = C_GossipInfo and C_GossipInfo.SelectAvailableQuest or SelectAvailableQuest
+local C_GossipInfo_SelectOption = C_GossipInfo and C_GossipInfo.SelectOption or SelectGossipOption
 local C_Item_GetItemInfo = W.Compatibility.GetItemInfo
-local C_Minimap_IsTrackingHiddenQuests = C_Minimap and C_Minimap.IsTrackingHiddenQuests or function() return false end
-local C_QuestInfoSystem_GetQuestClassification = C_QuestInfoSystem and C_QuestInfoSystem.GetQuestClassification or function() return nil end
-local C_QuestLog_GetInfo = C_QuestLog and C_QuestLog.GetInfo or function() return nil end
-local C_QuestLog_GetLogIndexForQuestID = C_QuestLog and C_QuestLog.GetLogIndexForQuestID or function() return nil end
-local C_QuestLog_GetQuestTagInfo = C_QuestLog and C_QuestLog.GetQuestTagInfo or function() return nil end
-local C_QuestLog_IsQuestFlaggedCompletedOnAccount = C_QuestLog and C_QuestLog.IsQuestFlaggedCompletedOnAccount or function() return false end
-local C_QuestLog_IsQuestTrivial = C_QuestLog and C_QuestLog.IsQuestTrivial or function() return false end
-local C_QuestLog_IsRepeatableQuest = C_QuestLog and C_QuestLog.IsRepeatableQuest or function() return false end
-local C_QuestLog_IsWorldQuest = C_QuestLog and C_QuestLog.IsWorldQuest or function() return false end
+-- The Wrath client does not expose a "track hidden/trivial quests" query.
+local C_Minimap_IsTrackingHiddenQuests = C_Minimap and C_Minimap.IsTrackingHiddenQuests or function()
+	return false
+end
+-- Quest classification (recurring/calling/meta) is a retail-only API.
+local C_QuestInfoSystem_GetQuestClassification = C_QuestInfoSystem and C_QuestInfoSystem.GetQuestClassification or function()
+	return nil
+end
+local C_QuestLog_GetInfo = C_QuestLog and C_QuestLog.GetInfo or function(index)
+	if not GetQuestLogTitle then return nil end
+	local title, level, tag, suggestedGroup, isHeader, isCollapsed, isComplete, isDaily, questID = GetQuestLogTitle(index)
+	return title and { title = title, level = level, questTag = tag, suggestedGroup = suggestedGroup, isHeader = isHeader, isCollapsed = isCollapsed, isComplete = isComplete, isDaily = isDaily, questID = questID }
+end
+local C_QuestLog_GetLogIndexForQuestID = C_QuestLog and C_QuestLog.GetLogIndexForQuestID or function(questID)
+	if not GetQuestLogTitle then return nil end
+	for index = 1, GetNumQuestLogEntries() do
+		local _, _, _, _, isHeader, _, _, _, id = GetQuestLogTitle(index)
+		if not isHeader and id == questID then return index end
+	end
+end
+local C_QuestLog_GetQuestTagInfo = W.Compatibility.GetQuestTagInfo
+local C_QuestLog_IsQuestFlaggedCompletedOnAccount = W.Compatibility.IsQuestFlaggedCompletedOnAccount or function() return false end
+local C_QuestLog_IsQuestTrivial = C_QuestLog and C_QuestLog.IsQuestTrivial or IsQuestTrivial
+local C_QuestLog_IsRepeatableQuest = C_QuestLog and C_QuestLog.IsRepeatableQuest or IsRepeatableQuest
+-- World quests do not exist on the Wrath client; there is no native equivalent.
+local C_QuestLog_IsWorldQuest = (C_QuestLog and C_QuestLog.IsWorldQuest) or IsWorldQuest or function()
+	return false
+end
 
 local GossipOptionRecFlags = _G.Enum and _G.Enum.GossipOptionRecFlags or {}
 local QuestClassification = _G.Enum and _G.Enum.QuestClassification or {}
@@ -79,8 +98,8 @@ local Enum_QuestClassification_Meta = QuestClassification.Meta
 local Enum_QuestClassification_Recurring = QuestClassification.Recurring
 local Enum_QuestFrequency_Default = QuestFrequency.Default or 0
 
-local DELVE_STRING = "^|cFF0000FF.-" .. DELVE_LABEL
-local RED_QUEST_STRING = "^|cFF0000FF.-" .. QUESTS_LABEL
+local DELVE_STRING = "^|cFF0000FF.-" .. (DELVE_LABEL or "Delve")
+local RED_QUEST_STRING = "^|cFF0000FF.-" .. (QUESTS_LABEL or "Quests")
 local SKIP_STRING_1 = "^.+|cFFFF0000<.+>|r"
 local SKIP_STRING_2 = "|cnRED_FONT_COLOR"
 
@@ -413,9 +432,9 @@ function TI:GOSSIP_SHOW()
 	end
 
 	-- 1. Attempt to complete active quests first
-	local numActiveQuests = C_GossipInfo_GetNumActiveQuests()
+	local numActiveQuests = C_GossipInfo_GetNumActiveQuests and C_GossipInfo_GetNumActiveQuests() or 0
 	if numActiveQuests > 0 then
-		for _, gossipQuestUIInfo in ipairs(C_GossipInfo_GetActiveQuests()) do
+		for _, gossipQuestUIInfo in ipairs(C_GossipInfo_GetActiveQuests and C_GossipInfo_GetActiveQuests() or {}) do
 			local questID = gossipQuestUIInfo.questID
 			local isWorldQuest = C_QuestLog_IsWorldQuest(questID)
 			if
@@ -432,7 +451,11 @@ function TI:GOSSIP_SHOW()
 	end
 
 	-- 2. Before accepting quests, check for skip strings in gossip options
-	local gossipOptions = C_GossipInfo_GetOptions() or { C_GossipInfo_GetActiveDelveGossip() }
+	local gossipOptions = C_GossipInfo_GetOptions and C_GossipInfo_GetOptions() or {}
+	if #gossipOptions == 0 and C_GossipInfo_GetActiveDelveGossip then
+		local delve = C_GossipInfo_GetActiveDelveGossip()
+		if delve then gossipOptions[1] = delve end
+	end
 	for _, gossipOption in ipairs(gossipOptions) do
 		if strfind(gossipOption.name, SKIP_STRING_1) or strfind(gossipOption.name, SKIP_STRING_2) then
 			return
@@ -440,9 +463,9 @@ function TI:GOSSIP_SHOW()
 	end
 
 	-- 3. Attempt to accept available quests
-	local numAvailableQuests = C_GossipInfo_GetNumAvailableQuests()
+	local numAvailableQuests = C_GossipInfo_GetNumAvailableQuests and C_GossipInfo_GetNumAvailableQuests() or 0
 	if numAvailableQuests > 0 then
-		for _, gossipQuestUIInfo in ipairs(C_GossipInfo_GetAvailableQuests()) do
+		for _, gossipQuestUIInfo in ipairs(C_GossipInfo_GetAvailableQuests and C_GossipInfo_GetAvailableQuests() or {}) do
 			local isTrivial = gossipQuestUIInfo.isTrivial
 			local questID = gossipQuestUIInfo.questID
 			if
@@ -674,7 +697,8 @@ function TI:AttemptAutoComplete(event)
 		return
 	end
 
-	if GetNumAutoQuestPopUps() > 0 then
+	-- Auto quest popups are a retail-only system; on Wrath this branch is never taken.
+	if GetNumAutoQuestPopUps and GetNumAutoQuestPopUps() > 0 then
 		if UnitIsDeadOrGhost("player") then
 			self:RegisterEvent("PLAYER_REGEN_ENABLED", "AttemptAutoComplete")
 			return

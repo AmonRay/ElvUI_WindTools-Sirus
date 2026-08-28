@@ -9,9 +9,11 @@ local strfind = strfind
 
 local GetCreatureDifficultyColor = GetCreatureDifficultyColor
 local GetGuildInfo = GetGuildInfo
-local UnitEffectiveLevel = UnitEffectiveLevel
+-- UnitEffectiveLevel is Cata+; on 3.3.5a fall back to UnitLevel, and as a last
+-- resort to a no-op so the upvalue can never be nil on any client.
+local UnitEffectiveLevel = UnitEffectiveLevel or UnitLevel or function() return 0 end
+local UnitLevel = UnitLevel or function() return 0 end
 local UnitClass = UnitClass
-local UnitLevel = UnitLevel
 local UnitRace = UnitRace
 local UnitSex = UnitSex
 
@@ -30,7 +32,12 @@ function T:SetUnitText(_, tt, unit, isPlayerUnit)
 	end
 
 	local guildName = GetGuildInfo(unit)
-	local levelLine, specLine = ET:GetLevelLine(tt, (guildName and 2) or 1)
+	-- ET:GetLevelLine is a retail ElvUI method (absent on the 3.3.5a fork); the
+	-- rest of the function degrades to plain unit text when it is unavailable.
+	local levelLine, specLine
+	if ET and type(ET.GetLevelLine) == "function" then
+		levelLine, specLine = ET:GetLevelLine(tt, (guildName and 2) or 1)
+	end
 	local level, realLevel = UnitEffectiveLevel(unit), UnitLevel(unit)
 
 	if levelLine then

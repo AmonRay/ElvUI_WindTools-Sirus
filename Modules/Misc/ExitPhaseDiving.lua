@@ -13,6 +13,14 @@ async.WithSpellID(1250255, function(spell)
 	tooltipTitle = F.GetWindStyleText(spell:GetSpellName())
 end)
 
+-- Phase Diving (spell 1250255 / aura 1214374) is a retail-only mechanic. On
+-- clients without the spell the module would create a useless invisible button
+-- and hit legacy API gaps (Texture:EnableMouse / SetColorTexture), so gate it.
+local function isExitPhaseDivingAvailable()
+	local GetSpellInfo = W.Compatibility.GetSpellInfo
+	return GetSpellInfo and GetSpellInfo(1250255) ~= nil
+end
+
 local function visuallyHide(button)
 	button.backdrop:SetAlpha(0)
 	button.Icon:SetAlpha(0)
@@ -26,7 +34,7 @@ local function visuallyShow(button)
 end
 
 local function updateVisual(button)
-	if E:GetAuraByID("player", 1214374, "HELPFUL") then
+	if E.GetAuraByID and E:GetAuraByID("player", 1214374, "HELPFUL") then
 		visuallyShow(button)
 	else
 		visuallyHide(button)
@@ -58,17 +66,23 @@ local function createButton()
 
 	button.Icon = button:CreateTexture(nil, "ARTWORK")
 	button.Icon:SetAllPoints()
-	button.Icon:EnableMouse(false)
+	if button.Icon.EnableMouse then
+		button.Icon:EnableMouse(false)
+	end
 	button.Icon:SetTexture(4913234)
 
 	button.Highlight = button:CreateTexture(nil, "HIGHLIGHT")
 	button.Highlight:SetAllPoints()
 	button.Highlight:SetTexture(E.media.blankTex)
-	button.Highlight:SetColorTexture(1, 1, 1, 0.15)
+	if button.Highlight.SetColorTexture then
+		button.Highlight:SetColorTexture(1, 1, 1, 0.15)
+	else
+		button.Highlight:SetVertexColor(1, 1, 1, 0.15)
+	end
 	button.Highlight:Hide()
 
 	button:SetScript("OnEnter", function()
-		if E:GetAuraByID("player", 1214374, "HELPFUL") then
+		if E.GetAuraByID and E:GetAuraByID("player", 1214374, "HELPFUL") then
 			button.Highlight:Show()
 			_G.GameTooltip:SetOwner(button, "ANCHOR_BOTTOM", 0, -5)
 			_G.GameTooltip:SetText(tooltipTitle, 1, 1, 1)
@@ -108,6 +122,10 @@ local function createButton()
 end
 
 function M:ExitPhaseDiving()
+	if not isExitPhaseDivingAvailable() then
+		return
+	end
+
 	if E.db.WT.misc.exitPhaseDiving.enable then
 		self.ExitPhaseDivingButton = createButton()
 		updateButton(self.ExitPhaseDivingButton, E.db.WT.misc.exitPhaseDiving)
@@ -115,6 +133,10 @@ function M:ExitPhaseDiving()
 end
 
 function M:UpdateExitPhaseDivingButton()
+	if not isExitPhaseDivingAvailable() then
+		return
+	end
+
 	F.TaskManager:OutOfCombat(function()
 		if E.db.WT.misc.exitPhaseDiving.enable and not self.ExitPhaseDivingButton then
 			self.ExitPhaseDivingButton = createButton()

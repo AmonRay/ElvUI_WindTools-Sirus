@@ -5,7 +5,7 @@ local async = W.Utilities.Async
 local LSM = E.Libs.LSM
 
 local DI = W:GetModule("DeleteItem")
-local AK = W:GetModule("AlreadyKnown")
+local AK = W:GetModule("AlreadyKnown", true) or {}
 local FL = W:GetModule("FastLoot")
 local TD = W:GetModule("Trade")
 local EB = W:GetModule("ExtraItemsBar")

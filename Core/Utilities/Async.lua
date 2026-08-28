@@ -47,8 +47,13 @@ function W.Utilities.Async.WithItemID(itemID, callback)
 		return cache.item[itemID]
 	end
 
+	if not Item or type(Item.CreateFromItemID) ~= "function" then
+		F.Developer.LogDebug("Item API is unavailable for itemID: " .. itemID)
+		return
+	end
+
 	local itemInstance = Item:CreateFromItemID(itemID)
-	if itemInstance:IsItemEmpty() then
+	if not itemInstance or type(itemInstance.IsItemEmpty) ~= "function" or itemInstance:IsItemEmpty() then
 		F.Developer.LogDebug("Failed to create item instance for itemID: " .. itemID)
 		return
 	end
@@ -112,7 +117,15 @@ function W.Utilities.Async.WithSpellID(spellID, callback)
 		return cache.spell[spellID]
 	end
 
+	if not Spell or type(Spell.CreateFromSpellID) ~= "function" then
+		F.Developer.LogDebug("Spell API is unavailable for spellID: " .. spellID)
+		return
+	end
+
 	local spellInstance = Spell:CreateFromSpellID(spellID)
+	if not spellInstance or type(spellInstance.IsSpellEmpty) ~= "function" then
+		return
+	end
 
 	if spellInstance:IsSpellEmpty() then
 		F.Developer.LogDebug("Failed to create spell instance for spellID: " .. spellID)
@@ -315,6 +328,11 @@ function W.Utilities.Async.WithSpellIDTable(spellIDTable, tType, callback, table
 	end
 end
 
+-- The retail Item instance API (Item:CreateFromEquipmentSlot /
+-- ItemLocation, IsItemEmpty / ContinueOnItemLoad) does not exist on 3.3.5a.
+-- Fall back to resolving the equipment slot's item link via GetInventoryItemLink
+-- and pass a nil-safe stub so callers that branch on itemInstance handle both
+-- retail and Wrath paths (ExtraItemBar guards the missing instance).
 function W.Utilities.Async.WithItemSlotID(itemSlotID, callback)
 	if type(itemSlotID) ~= "number" then
 		return
@@ -328,17 +346,50 @@ function W.Utilities.Async.WithItemSlotID(itemSlotID, callback)
 		return
 	end
 
-	local itemInstance = Item:CreateFromEquipmentSlot(itemSlotID)
-	if itemInstance:IsItemEmpty() then
-		F.Developer.LogDebug("Failed to create item instance for itemSlotID: " .. itemSlotID)
-		return
+	local ItemAPI = _G.Item
+	local itemInstance
+	if type(ItemAPI) == "table" and type(ItemAPI.CreateFromEquipmentSlot) == "function" then
+		itemInstance = ItemAPI:CreateFromEquipmentSlot(itemSlotID)
+		if itemInstance and itemInstance:IsItemEmpty() then
+			return
+		end
+		if itemInstance then
+			itemInstance:ContinueOnItemLoad(function()
+				callback(itemInstance)
+			end)
+		end
+		return itemInstance
 	end
 
-	itemInstance:ContinueOnItemLoad(function()
-		callback(itemInstance)
-	end)
-
-	return itemInstance
+	-- Wrath: no Item instance API. Build a minimal stub from GetInventoryItemLink
+	-- so callers can still pull the link-based fields (name / icon / id).
+	local link = GetInventoryItemLink("player", itemSlotID)
+	local stub = {} ---@type any
+	stub.CreateFromEquipmentSlot = function() return stub end
+	if type(link) == "string" then
+		-- GetItemInfo returns (name, link, rarity, itemLevel, ...)
+		local name, _, rarity = GetItemInfo(link)
+		stub.GetItemName = function() return name end
+		stub.GetItemID = function()
+			local id = link:match("item:(%d+):")
+			return id and tonumber(id)
+		end
+		stub.GetItemIcon = function() return GetItemIcon(link) end
+		stub.GetItemQualityColor = function()
+			if type(rarity) == "number" and GetItemQualityColor then
+				local r, g, b = GetItemQualityColor(rarity)
+				return { r = r, g = g, b = b }
+			end
+			return nil
+		end
+	else
+		stub.GetItemName = function() return nil end
+		stub.GetItemID = function() return nil end
+		stub.GetItemIcon = function() return nil end
+		stub.GetItemQualityColor = function() return nil end
+	end
+	callback(stub)
+	return stub
 end
 
 local function onAchievementInfoFetched(achievementID, callback, attempt)

@@ -8,6 +8,12 @@ local tonumber = tonumber
 
 local C_CVar_GetCVar = W.Compatibility.GetCVar
 local Enum_ScreenLocationType = _G.Enum and _G.Enum.ScreenLocationType or {}
+local SCREEN_TOP = Enum_ScreenLocationType.Top
+local SCREEN_BOTTOM = Enum_ScreenLocationType.Bottom
+local SCREEN_LEFT = Enum_ScreenLocationType.Left
+local SCREEN_LEFT_OUTSIDE = Enum_ScreenLocationType.LeftOutside
+local SCREEN_RIGHT = Enum_ScreenLocationType.Right
+local SCREEN_RIGHT_OUTSIDE = Enum_ScreenLocationType.RightOutside
 
 function SA:Update()
 	if not self.db or not _G.SpellActivationOverlayFrame then
@@ -24,14 +30,20 @@ function SA:Update()
 end
 
 ---@type table<Enum.ScreenLocationType, {spellID: number, textureID: number}>
-local previewData = {
-	[Enum_ScreenLocationType.Top] = { spellID = 123986, textureID = 449488 },
-	[Enum_ScreenLocationType.Bottom] = { spellID = 123986, textureID = 449487 },
-	[Enum_ScreenLocationType.Left] = { spellID = 123986, textureID = 450929 },
-	[Enum_ScreenLocationType.LeftOutside] = { spellID = 123986, textureID = 449490 },
-	[Enum_ScreenLocationType.Right] = { spellID = 123986, textureID = 449490 },
-	[Enum_ScreenLocationType.RightOutside] = { spellID = 123986, textureID = 450929 },
+local previewData = {}
+local positions = {
+	{ SCREEN_TOP, 449488 },
+	{ SCREEN_BOTTOM, 449487 },
+	{ SCREEN_LEFT, 450929 },
+	{ SCREEN_LEFT_OUTSIDE, 449490 },
+	{ SCREEN_RIGHT, 449490 },
+	{ SCREEN_RIGHT_OUTSIDE, 450929 },
 }
+for _, entry in ipairs(positions) do
+	if entry[1] ~= nil then
+		previewData[entry[1]] = { spellID = 123986, textureID = entry[2] }
+	end
+end
 
 function SA:Preview()
 	if not _G.SpellActivationOverlayFrame then

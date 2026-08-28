@@ -25,9 +25,12 @@ function S:SettingsPanel()
 		return
 	end
 
-	self:CreateBackdropShadow(_G.SettingsPanel)
-
-	hooksecurefunc(_G.SettingsPanel.Container.SettingsList.ScrollBox, "Update", SettingsListScrollUpdate)
+	-- The retail SettingsPanel (Blizzard_InterfaceOptions) does not exist on
+	-- 3.3.5a; Wrath uses the InterfaceOptionsFrame AddOns/Category panels.
+	if _G.SettingsPanel and _G.SettingsPanel.Container and _G.SettingsPanel.Container.SettingsList then
+		self:CreateBackdropShadow(_G.SettingsPanel)
+		hooksecurefunc(_G.SettingsPanel.Container.SettingsList.ScrollBox, "Update", SettingsListScrollUpdate)
+	end
 end
 
 S:AddCallback("SettingsPanel")

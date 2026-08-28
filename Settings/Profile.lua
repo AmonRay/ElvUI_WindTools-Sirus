@@ -168,44 +168,6 @@ P.combat = {
 	quickKeystone = {
 		enable = true,
 	},
-	damageMeterLayout = {
-		enable = false,
-		width = 400,
-		height = 300,
-		backdrop = true,
-		shadow = true,
-		animation = {
-			enable = true,
-			duration = 0.37,
-		},
-		layouts = {
-			{
-				name = format(L["Layout %d"], 1),
-				direction = "VERTICAL",
-				outerPadding = 0,
-				innerPadding = 2,
-				meters = {
-					{ windowIndex = 1, weight = 7, hidden = false },
-					{ windowIndex = 2, weight = 10, hidden = false },
-				},
-			},
-			{
-				name = format(L["Layout %d"], 2),
-				direction = "VERTICAL",
-				outerPadding = 0,
-				innerPadding = 2,
-				meters = {
-					{ windowIndex = 1, weight = 1, hidden = true },
-					{ windowIndex = 2, weight = 1, hidden = false },
-				},
-			},
-		},
-		activeLayout = 1,
-		autoSwitch = {
-			enable = false,
-			rules = { combat = 1, outOfCombat = 2, mythicPlus = 1, raid = 1, delve = 2 },
-		},
-	},
 }
 
 ---@class ProfileDB.item
@@ -253,7 +215,7 @@ P.item = {
 			enable = true,
 			mouseOver = false,
 			globalFade = false,
-			visibility = "[petbattle]hide;show",
+			visibility = "show",
 			fadeTime = 0.3,
 			alphaMin = 0,
 			alphaMax = 1,
@@ -301,7 +263,7 @@ P.item = {
 			enable = true,
 			mouseOver = false,
 			globalFade = false,
-			visibility = "[petbattle]hide;show",
+			visibility = "show",
 			fadeTime = 0.3,
 			alphaMin = 0,
 			alphaMax = 1,
@@ -349,7 +311,7 @@ P.item = {
 			enable = true,
 			mouseOver = false,
 			globalFade = false,
-			visibility = "[petbattle]hide;show",
+			visibility = "show",
 			fadeTime = 0.3,
 			alphaMin = 0,
 			alphaMax = 1,
@@ -397,7 +359,7 @@ P.item = {
 			enable = false,
 			mouseOver = false,
 			globalFade = false,
-			visibility = "[petbattle]hide;show",
+			visibility = "show",
 			fadeTime = 0.3,
 			alphaMin = 0,
 			alphaMax = 1,
@@ -445,7 +407,7 @@ P.item = {
 			enable = false,
 			mouseOver = false,
 			globalFade = false,
-			visibility = "[petbattle]hide;show",
+			visibility = "show",
 			fadeTime = 0.3,
 			alphaMin = 0,
 			alphaMax = 1,
@@ -1309,7 +1271,7 @@ P.misc = {
 		customNormalColor = { r = 1, g = 1, b = 1 },
 		customHoverColor = { r = 0, g = 0.659, b = 1 },
 		notification = true,
-		visibility = "[petbattle] hide; show",
+		visibility = "show",
 		tooltipsAnchor = "ANCHOR_BOTTOM",
 		groupFinder = {
 			preferNetEaseMeetingStone = false,

@@ -758,7 +758,7 @@ do
 			[443328] = {cooldown = 30,	duration = 0,	specs = {1468, 1467}, 		talent = false, charges = 2,    class = "EVOKER", 	type = 3}, --Engulf
 		}
 
-		C_Timer.After(0, function()
+		C_Timer:After(0, function()
 			for spellId in pairs(LIB_OPEN_RAID_COOLDOWNS_INFO) do
 				local spellInfo = C_Spell.GetSpellInfo(spellId)
 				if (not spellInfo) then
@@ -1432,7 +1432,7 @@ do
     end
 
     --this will make sure to always have the latest data
-	C_Timer.After(0, function()
+	C_Timer:After(0, function()
 		if (openRaidLib.__version == LIB_OPEN_RAID_MAX_VERSION) then
 			loadLibDatabase()
 		end

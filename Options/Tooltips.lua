@@ -558,7 +558,7 @@ do
 				local result = {}
 				for _, data in pairs(W.MythicPlusSeasonAchievementData) do
 					result[data.id] = data
-					result[data.id].desc = format("%s\n\n%s", data.abbr, data.desc)
+					result[data.id].desc = format("%s\n\n%s", data.abbr or "", data.desc or "")
 				end
 				return result
 			end)(),
@@ -576,10 +576,11 @@ do
 		end
 
 		for id, data in pairs(config.data) do
-			target.args[data.idString] = {
+			local dataKey = data.idString or tostring(id)
+			target.args[dataKey] = {
 				order = config.order(id),
 				type = "toggle",
-				name = format("|T%s:16:18:0:0:64:64:4:60:7:57:255:255:255|t %s", data.tex, data.name),
+				name = format("|T%s:16:18:0:0:64:64:4:60:7:57:255:255:255|t %s", data.tex or "", data.name or data.abbr or tostring(id)),
 				desc = data.desc,
 				width = config.width or "full",
 			}

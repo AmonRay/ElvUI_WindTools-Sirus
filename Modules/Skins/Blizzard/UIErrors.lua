@@ -45,7 +45,7 @@ function S:UIErrors()
 		if params.r == nil or params.g == nil or params.b == nil then
 			local db = E.private.WT.skins.uiErrors
 			if db.normalTextClassColor then
-				params.r, params.g, params.b = E.myClassColor:GetRGBA()
+				params.r, params.g, params.b = E.myClassColor.r, E.myClassColor.g, E.myClassColor.b
 				params.a = 1
 			else
 				params.r, params.g, params.b, params.a =

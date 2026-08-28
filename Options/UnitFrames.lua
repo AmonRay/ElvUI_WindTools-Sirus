@@ -418,9 +418,13 @@ options.absorb = {
 local SampleStrings = {}
 do
 	local icons = ""
-	icons = icons .. E:TextureString(CT.cache.elvuiRoleIconsPath.Tank, ":16:16:0:0:64:64:2:56:2:56") .. " "
-	icons = icons .. E:TextureString(CT.cache.elvuiRoleIconsPath.Healer, ":16:16:0:0:64:64:2:56:2:56") .. " "
-	icons = icons .. E:TextureString(CT.cache.elvuiRoleIconsPath.DPS, ":16:16")
+	local roleIcons = CT.cache and CT.cache.elvuiRoleIconsPath or {}
+	local tankIcon = roleIcons.Tank or "Interface\\\\LFGFrame\\\\UI-LFG-ICON-PORTRAITROLES"
+	local healerIcon = roleIcons.Healer or tankIcon
+	local dpsIcon = roleIcons.DPS or tankIcon
+	icons = icons .. E:TextureString(tankIcon, ":16:16:0:0:64:64:2:56:2:56") .. " "
+	icons = icons .. E:TextureString(healerIcon, ":16:16:0:0:64:64:2:56:2:56") .. " "
+	icons = icons .. E:TextureString(dpsIcon, ":16:16")
 	SampleStrings.ELVUI = icons
 
 	for _, pack in ipairs({ "FFXIV", "PHILMOD", "HEXAGON", "SUNUI", "LYNUI", "ELVUI_OLD", "DEFAULT", "BLIZZARD" }) do
@@ -737,7 +741,7 @@ do
 		examples.color[classFile] = {
 			order = i,
 			tag = format("[classcolor:%s]", strlower(classFile)),
-			text = format(L["The color of %s"], C.StringWithClassColor(classNames[classFile], classFile)),
+			text = format(L["The color of %s"] or "The color of %s", C.StringWithClassColor(classNames[classFile] or classFile, classFile)),
 		}
 	end
 
@@ -777,7 +781,7 @@ do
 			}
 			examples["classIcon_" .. style][classFile .. "_TAG"] = {
 				order = 3 * i + 2,
-				text = C.StringWithClassColor(classNames[classFile], classFile),
+				text = C.StringWithClassColor(classNames[classFile] or classFile, classFile),
 				tag = "[classicon-" .. style .. ":" .. strlower(classFile) .. "]",
 				width = 1.5,
 			}

@@ -14,11 +14,27 @@ local strmatch = strmatch
 local tinsert = tinsert
 local tostring = tostring
 
-local C_Club_GetClubInfo = C_Club and C_Club.GetClubInfo or function() return nil end
-local C_GuildInfo_IsGuildOfficer = C_GuildInfo and C_GuildInfo.IsGuildOfficer or function() return false end
-local ChatFrameUtil_OpenChat = ChatFrameUtil.OpenChat
+-- Wrath has no C_GuildInfo; an officer is anyone who can edit officer notes.
+local C_GuildInfo_IsGuildOfficer = C_GuildInfo and C_GuildInfo.IsGuildOfficer or (CanEditOfficerNote and function()
+	return CanEditOfficerNote()
+end) or function() return false end
+local ChatEdit_ChooseBoxForSend = ChatEdit_ChooseBoxForSend
+local ChatEdit_ActivateChat = ChatEdit_ActivateChat
 local CreateFrame = CreateFrame
 local DefaultChatFrame = _G.DEFAULT_CHAT_FRAME
+local function ChatFrameUtil_OpenChat(text, chatFrame)
+	-- Wrath has no ChatFrameUtil.OpenChat; open the edit box natively.
+	chatFrame = chatFrame or DefaultChatFrame
+	local editBox = ChatEdit_ChooseBoxForSend and ChatEdit_ChooseBoxForSend(chatFrame) or chatFrame and chatFrame.editBox
+	if editBox and editBox.SetText then
+		editBox:SetText(text or "")
+		if ChatEdit_ActivateChat then
+			ChatEdit_ActivateChat(editBox)
+		elseif editBox.SetFocus then
+			editBox:SetFocus()
+		end
+	end
+end
 local GetChannelList = GetChannelList
 local GetChannelName = GetChannelName
 local InCombatLockdown = InCombatLockdown
@@ -32,19 +48,16 @@ local RandomRoll = RandomRoll
 local UnitIsGroupAssistant = UnitIsGroupAssistant
 local UnitIsGroupLeader = UnitIsGroupLeader
 
-local LE_PARTY_CATEGORY_HOME = LE_PARTY_CATEGORY_HOME
-local LE_PARTY_CATEGORY_INSTANCE = LE_PARTY_CATEGORY_INSTANCE
-
 local BUTTON_HOVER_FONT_SIZE_INCREASE = 4
 local MOUSE_OVER_HEIGHT_PADDING = 6
 local NORMAL_CHANNELS = { "SAY", "YELL", "PARTY", "INSTANCE", "RAID", "RAID_WARNING", "GUILD", "OFFICER", "EMOTE" }
 
 local checkFunctions = {
 	PARTY = function()
-		return IsInGroup(LE_PARTY_CATEGORY_HOME)
+		return IsInGroup() and not IsInRaid()
 	end,
 	INSTANCE = function()
-		return IsInGroup(LE_PARTY_CATEGORY_INSTANCE)
+		return IsInInstance()
 	end,
 	RAID = function()
 		return IsInRaid()
@@ -61,17 +74,20 @@ local checkFunctions = {
 }
 
 ---Get community channel ID by channel name
+---Wrath has no communities (C_Club); there are no community channels.
 ---@param text string The community channel name to search for
 ---@return number? channelId The channel ID if found
 local function GetCommunityChannelByName(text)
+	if not text then
+		return
+	end
+
 	local channelList = { GetChannelList() }
 	for _, v in pairs(channelList) do
-		local clubId = strmatch(tostring(v), "Community:(.-):")
-		if clubId then
-			local info = C_Club_GetClubInfo(clubId)
-			if info and info.name == text then
-				return select(1, GetChannelName(tostring(v)))
-			end
+		-- Sirus/Wrath channels carry no "Community:clubId:" prefix; plain-name match only.
+		local channelName = select(2, GetChannelName(tostring(v)))
+		if channelName == text then
+			return select(1, GetChannelName(tostring(v)))
 		end
 	end
 end
@@ -226,7 +242,7 @@ function CB:UpdateButton(name, func, anchorPoint, x, y, color, tex, tooltip, tip
 	local ElvUIValueColor = E.db.general.valuecolor
 
 	if not self.bar[name] then
-		local button = CreateFrame("Button", nil, self.bar, "SecureActionButtonTemplate, BackdropTemplate") --[[@as Button]]
+		local button = CreateFrame("Button", nil, self.bar, "SecureActionButtonTemplate") --[[@as Button]]
 		button:StripTextures()
 		button:SetBackdropBorderColor(0, 0, 0)
 		button:RegisterForClicks("AnyDown")

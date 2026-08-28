@@ -30,60 +30,87 @@ local tonumber = tonumber
 local tremove = tremove
 local type = type
 local unpack = unpack
-local utf8sub = string.utf8sub
+local utf8sub = string.utf8sub or (type(_G.utf8) == "table" and _G.utf8.sub)
 local wipe = wipe
 
-local Ambiguate = Ambiguate
+-- Ambiguate is a retail helper absent on 3.3.5a; the standard Wrath shim
+-- (see MRT/Compat335.lua) strips everything after the first hyphento match
+-- name-only lookups from GetGuildRosterInfo / chat events.
+local Ambiguate = Ambiguate or function(name)
+	if type(name) ~= "string" then
+		return name
+	end
+	return (name:match("^([^%-]+)") or name)
+end
 local BNGetNumFriendInvites = BNGetNumFriendInvites
 local BNGetNumFriends = BNGetNumFriends
-local ChatEditSetLastTellTarget = ChatFrameUtil.SetLastTellTarget
+local ChatFrameUtil = _G.ChatFrameUtil
+local ChatEditSetLastTellTarget = ChatEdit_SetLastTellTarget or function() end
 local FlashClientIcon = FlashClientIcon
 local GMChatFrame_IsGM = GMChatFrame_IsGM
 local GetAchievementLink = GetAchievementLink
-local GetBNPlayerCommunityLink = GetBNPlayerCommunityLink
-local GetBNPlayerLink = GetBNPlayerLink
 local GetCVar = W.Compatibility.GetCVar
 local GetCVarBool = W.Compatibility.GetCVarBool
 local GetChannelName = GetChannelName
-local GetChannelRuleset = C_ChatInfo and C_ChatInfo.GetChannelRuleset or function() return nil end
-local GetChannelShortcutForChannelID = C_ChatInfo and C_ChatInfo.GetChannelShortcutForChannelID or function() return nil end
-local GetChatCategory = ChatFrameUtil.GetChatCategory
-local GetClientTexture = BNet_GetClientEmbeddedTexture
-local GetMobileEmbeddedTexture = ChatFrameUtil.GetMobileEmbeddedTexture
+local GetChannelRuleset = C_ChatInfo and C_ChatInfo.GetChannelRuleset or GetChannelRuleset
+local GetChannelShortcutForChannelID = C_ChatInfo and C_ChatInfo.GetChannelShortcutForChannelID or GetChannelShortcutForChannelID
+local GetChatCategory = _G.Chat_GetChatCategory
 local GetNumGroupMembers = GetNumGroupMembers
-local GetPlayerCommunityLink = GetPlayerCommunityLink
-local GetTitleIconTexture = C_Texture and C_Texture.GetTitleIconTexture or function() return nil end
 local InCombatLockdown = InCombatLockdown
-local IsChannelRegionalForChannelID = C_ChatInfo and C_ChatInfo.IsChannelRegionalForChannelID or function() return false end
-local IsChatLineCensored = C_ChatInfo and C_ChatInfo.IsChatLineCensored or function() return false end
+local IsChannelRegionalForChannelID = C_ChatInfo and C_ChatInfo.IsChannelRegionalForChannelID or IsChannelRegionalForChannelID
+local IsChatLineCensored = C_ChatInfo and C_ChatInfo.IsChatLineCensored or IsChatLineCensored
 local IsInGroup = IsInGroup
 local IsInRaid = IsInRaid
 local PlaySoundFile = PlaySoundFile
-local RemoveExtraSpaces = RemoveExtraSpaces
-local RemoveNewlines = RemoveNewlines
-local ResolvePrefixedChannelName = ChatFrameUtil.ResolvePrefixedChannelName
+-- Sirus ElvUI 9.05 defines RemoveExtraSpaces as a colon method
+-- (function E:RemoveExtraSpaces(message)); calling the raw reference with
+-- only the message shifts it into 'self' and leaves the real message nil
+-- for gsub. Always pass E as self; degrade to the raw message when absent.
+local function RemoveExtraSpaces(message)
+	if type(E.RemoveExtraSpaces) == "function" then
+		return E.RemoveExtraSpaces(E, message)
+	end
+	return message
+end
+-- Retail helper not present in this client; port it the same way FrameXML does.
+local function RemoveNewlines(str)
+	return gsub(str, "\r\n", "")
+end
+local ResolvePrefixedChannelName = ChatFrameUtil and ChatFrameUtil.ResolvePrefixedChannelName or function(name)
+	if type(name) == "string" and name ~= "" then
+		return strmatch(name, "^%[%d+%.?%s*(.-)%]") or name
+	end
+	return name
+end
 local UnitExists = UnitExists
 local UnitGroupRolesAssigned = UnitGroupRolesAssigned
 local UnitIsUnit = UnitIsUnit
 local UnitName = UnitName
 
-local C_BattleNet_GetAccountInfoByID = C_BattleNet and C_BattleNet.GetAccountInfoByID or function() return nil end
-local C_BattleNet_GetFriendAccountInfo = C_BattleNet and C_BattleNet.GetFriendAccountInfo or function() return nil end
-local C_BattleNet_GetFriendGameAccountInfo = C_BattleNet and C_BattleNet.GetFriendGameAccountInfo or function() return nil end
-local C_BattleNet_GetFriendNumGameAccounts = C_BattleNet and C_BattleNet.GetFriendNumGameAccounts or function() return 0 end
-local C_Club_GetClubInfo = C_Club and C_Club.GetClubInfo or function() return nil end
-local C_Club_GetClubMembers = C_Club and C_Club.GetClubMembers or function() return {} end
-local C_Club_GetGuildClubId = C_Club and C_Club.GetGuildClubId or function() return nil end
-local C_Club_GetInfoFromLastCommunityChatLine = C_Club and C_Club.GetInfoFromLastCommunityChatLine or function() return nil end
-local C_Club_GetMemberInfo = C_Club and C_Club.GetMemberInfo or function() return nil end
-local C_CreatureInfo_GetClassInfo = C_CreatureInfo and C_CreatureInfo.GetClassInfo or function() return nil end
+-- ElvUI 9.05 builds player links with a file-local FormatLink/GetPlayerLink pair;
+-- retail ChatFrameUtil and CH:GetPlayerLink do not exist on Wrath.
+local function FormatLink(linkType, linkDisplayText, ...)
+	local linkFormatTable = { ("|H%s"):format(linkType), ... }
+	local returnLink = table.concat(linkFormatTable, ":")
+	if linkDisplayText then
+		return returnLink .. ("|h%s|h"):format(linkDisplayText)
+	end
+	return returnLink .. "|h"
+end
+
+local function GetPlayerLink(characterName, linkDisplayText, lineID, chatType, chatTarget)
+	if lineID or chatType or chatTarget then
+		return FormatLink("player", linkDisplayText, characterName, lineID or 0, chatType or 0, chatTarget or "")
+	end
+	return FormatLink("player", linkDisplayText, characterName)
+end
 
 local CHATCHANNELRULESET_MENTOR = _G.Enum and _G.Enum.ChatChannelRuleset and _G.Enum.ChatChannelRuleset.Mentor
-local Constants_ChatFrameConstants_MaxChatWindows = Constants.ChatFrameConstants.MaxChatWindows
+local chatFrameConstants = Constants and Constants.ChatFrameConstants
+local Constants_ChatFrameConstants_MaxChatWindows = chatFrameConstants and chatFrameConstants.MaxChatWindows or NUM_CHAT_WINDOWS or 7
+
 local PLAYER_REALM = E:ShortenRealm(E.myrealm)
 local PLAYER_NAME = format("%s-%s", E.myname, PLAYER_REALM)
-local TitleIconVersion_Small = _G.Enum and _G.Enum.TitleIconVersion and _G.Enum.TitleIconVersion.Small
-local WOW_PROJECT_MAINLINE = WOW_PROJECT_MAINLINE
 
 CT.cache = {}
 local lfgRoles = {}
@@ -293,32 +320,12 @@ function CT.ShortChannel(channelLink)
 	end
 
 	if not abbr and CT.db.abbreviation == "SHORT" then
-		local name = select(2, GetChannelName(gsub(channelLink, "channel:", "")))
-
-		if name then
-			local communityID = strmatch(name, "Community:(%d+):")
-			if communityID then
-				local communityInfo = C_Club_GetClubInfo(communityID)
-
-				if communityInfo.clubType == 0 then
-					if communityInfo.name and CT.db and CT.db.customAbbreviation then
-						abbr = CT.db.customAbbreviation[communityInfo.name]
-					end
-					abbr = abbr or strupper(utf8sub(communityInfo.name, 1, 2))
-					abbr = E:TextGradient(abbr, 0.000, 0.592, 0.902, 0.000, 0.659, 1.000)
-				elseif communityInfo.clubType == 1 then
-					if CT.db and CT.db.customAbbreviation then
-						abbr = CT.db.customAbbreviation[communityInfo.name]
-					end
-					abbr = abbr or communityInfo.shortName or strupper(utf8sub(communityInfo.name, 1, 2))
-					abbr = C.StringWithRGB(abbr, 0.902, 0.494, 0.133)
-				end
-			else
+		local name = select(2, GetChannelName(gsub(channelLink, "channel:", "")))			if name then
+				-- Wrath has no communities (C_Club); channels are plain names.
 				if CT.db and CT.db.customAbbreviation then
 					abbr = CT.db.customAbbreviation[name]
 				end
 				abbr = abbr or utf8sub(name, 1, 1)
-			end
 		end
 	end
 
@@ -360,7 +367,9 @@ function CT:HandleShortChannels(msg, hide)
 end
 
 function CT:CheckLFGRoles()
-	if not CH.db.lfgIcons or not IsInGroup() then
+	-- ElvUI 9.05 has no lfgIcons option; enable role icons whenever a non-default
+	-- role icon style is selected in WindTools itself.
+	if not IsInGroup() or not CT.db or CT.db.roleIconStyle == "DEFAULT" then
 		return
 	end
 
@@ -773,8 +782,8 @@ local function ChatFrame_CheckAddChannel(chatFrame, eventType, channelID)
 		return false
 	end
 
-	-- Only add regional channels
-	if not IsChannelRegionalForChannelID(channelID) then
+	-- Only add regional channels (retail-only concept, absent on Wrath)
+	if not IsChannelRegionalForChannelID or not IsChannelRegionalForChannelID(channelID) then
 		return false
 	end
 
@@ -806,6 +815,11 @@ function CT:ChatFrame_MessageEventHandler(frame, event, arg1, arg2, arg3, arg4, 
 
 	if strsub(event, 1, 8) == 'CHAT_MSG' then
 		if arg16 then return true end -- hiding sender in letterbox: do NOT even show in chat window (only shows in cinematic frame)
+		-- Some Wrath/Sirus chat events fire without a message payload; there is
+		-- nothing to format or display, and nil would crash E:RemoveExtraSpaces.
+		if arg1 == nil then
+			return true
+		end
 
 		local chatType = strsub(event, 10)
 		local info = _G.ChatTypeInfo[chatType]
@@ -815,14 +829,15 @@ function CT:ChatFrame_MessageEventHandler(frame, event, arg1, arg2, arg3, arg4, 
 			return
 		end
 
-		if _G.ChatFrameUtil and _G.ChatFrameUtil.ProcessMessageEventFilters then
-			local filtered, new1, new2, new3, new4, new5, new6, new7, new8, new9, new10, new11, new12, new13, new14, new15, new16, new17 = _G.ChatFrameUtil.ProcessMessageEventFilters(frame, event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17)
+		local processFilters = ChatFrameUtil and ChatFrameUtil.ProcessMessageEventFilters
+		if processFilters then
+			local filtered, new1, new2, new3, new4, new5, new6, new7, new8, new9, new10, new11, new12, new13, new14, new15, new16, new17 = processFilters(frame, event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17)
 			if filtered then
 				return true
 			else
 				arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17 = new1, new2, new3, new4, new5, new6, new7, new8, new9, new10, new11, new12, new13, new14, new15, new16, new17
 			end
-		else
+		elseif _G.ChatFrame_GetMessageEventFilters then
 			local chatFilters = _G.ChatFrame_GetMessageEventFilters(event)
 			if chatFilters then
 				for _, filterFunc in next, chatFilters do
@@ -858,8 +873,8 @@ function CT:ChatFrame_MessageEventHandler(frame, event, arg1, arg2, arg3, arg4, 
 				if channelLength > strlen(value) then
 					local match = strupper(value) == strupper(arg9)
 					if not match then -- arg9 is the channel name without the number in front
-						local success, zoneChannel = pcall(CH.ChatFrame_GetZoneChannel, CH, frame, index)
-						match = success and arg7 > 0 and arg7 == zoneChannel
+						-- ElvUI 9.05 tracks zone channels directly on the frame, no CH helper
+						match = arg7 > 0 and frame.zoneChannelList and frame.zoneChannelList[index] == arg7
 					end
 
 					if match then
@@ -946,10 +961,10 @@ function CT:ChatFrame_MessageEventHandler(frame, event, arg1, arg2, arg3, arg4, 
 			frame:AddMessage(arg1, info.r, info.g, info.b, info.id, nil, nil, nil, nil, nil, isHistory, historyTime)
 		elseif strsub(chatType,1,11) == 'ACHIEVEMENT' then
 			-- Append [Share] hyperlink
-			frame:AddMessage(format(arg1, CH:GetPlayerLink(arg2, format(noBrackets and '%s' or '[%s]', coloredName))), info.r, info.g, info.b, info.id, nil, nil, nil, nil, nil, isHistory, historyTime)
+			frame:AddMessage(format(arg1, GetPlayerLink(arg2, format(noBrackets and '%s' or '[%s]', coloredName))), info.r, info.g, info.b, info.id, nil, nil, nil, nil, nil, isHistory, historyTime)
 		elseif strsub(chatType,1,18) == 'GUILD_ACHIEVEMENT' then
 			if not CT:ElvUIChat_AchievementMessageHandler(event, frame, arg1, arg12) then
-			frame:AddMessage(format(arg1, CH:GetPlayerLink(arg2, format(noBrackets and '%s' or '[%s]', coloredName))), info.r, info.g, info.b, info.id, nil, nil, nil, nil, nil, isHistory, historyTime)
+			frame:AddMessage(format(arg1, GetPlayerLink(arg2, format(noBrackets and '%s' or '[%s]', coloredName))), info.r, info.g, info.b, info.id, nil, nil, nil, nil, nil, isHistory, historyTime)
 			end
 		elseif chatType == 'PING' then
 			frame:AddMessage(arg1, info.r, info.g, info.b, info.id, nil, nil, nil, nil, nil, isHistory, historyTime)
@@ -999,8 +1014,8 @@ function CT:ChatFrame_MessageEventHandler(frame, event, arg1, arg2, arg3, arg4, 
 				local globalstring = _G['CHAT_'..arg1..'_NOTICE_TRIAL'] or _G['CHAT_'..arg1..'_NOTICE_BN'] or _G['CHAT_'..arg1..'_NOTICE']
 				if not globalstring then return end
 
-				local accessID = CH:GetAccessID(chatGroup, arg8)
-				local typeID = CH:GetAccessID(infoType, arg8, arg12)
+				local accessID = _G.ChatHistory_GetAccessID(chatGroup, arg8)
+				local typeID = _G.ChatHistory_GetAccessID(infoType, arg8, arg12)
 				frame:AddMessage(format(globalstring, arg8, ResolvePrefixedChannelName(arg4)), info.r, info.g, info.b, info.id, accessID, typeID, nil, nil, nil, isHistory, historyTime)
 			end
 		elseif chatType == 'BN_INLINE_TOAST_ALERT' then
@@ -1014,40 +1029,11 @@ function CT:ChatFrame_MessageEventHandler(frame, event, arg1, arg2, arg3, arg4, 
 				message = format(_G.BN_INLINE_TOAST_FRIEND_PENDING, BNGetNumFriendInvites())
 			elseif arg1 == 'FRIEND_REMOVED' or arg1 == 'BATTLETAG_FRIEND_REMOVED' then
 				message = format(globalstring, arg2)
-			elseif arg1 == 'FRIEND_ONLINE' or arg1 == 'FRIEND_OFFLINE' then
-				local accountInfo = C_BattleNet_GetAccountInfoByID(arg13)
-				local gameInfo = accountInfo and accountInfo.gameAccountInfo
-				if gameInfo and gameInfo.clientProgram and gameInfo.clientProgram ~= '' then
-					if GetTitleIconTexture then
-						GetTitleIconTexture(gameInfo.clientProgram, TitleIconVersion_Small, function(success, texture)
-							if success then
-								local charName = _G.BNet_GetValidatedCharacterNameWithClientEmbeddedTexture(gameInfo.characterName, accountInfo.battleTag, texture, 32, 32, 10)
-								local linkDisplayText = format(noBrackets and '%s (%s)' or '[%s] (%s)', arg2, charName)
-								local playerLink = CH:GetBNPlayerLink(arg2, linkDisplayText, arg13, arg11, chatGroup, 0)
-								frame:AddMessage(format(globalstring, playerLink), info.r, info.g, info.b, info.id, nil, nil, nil, nil, nil, isHistory, historyTime)
-
-								if notChatHistory then
-									FlashTabIfNotShown(frame, info, chatType, chatGroup, chatTarget)
-								end
-							end
-						end)
-
-						return
-					else
-						local clientTexture = GetClientTexture(gameInfo.clientProgram, 14)
-						local charName = _G.BNet_GetValidatedCharacterName(gameInfo.characterName, accountInfo.battleTag, gameInfo.clientProgram) or ''
-						local linkDisplayText = format(noBrackets and '%s (%s%s)' or '[%s] (%s%s)', arg2, clientTexture, charName)
-						local playerLink = CH:GetBNPlayerLink(arg2, linkDisplayText, arg13, arg11, chatGroup, 0)
-						message = format(globalstring, playerLink)
-					end
-				else
-					local linkDisplayText = format(noBrackets and '%s' or '[%s]', arg2)
-					local playerLink = CH:GetBNPlayerLink(arg2, linkDisplayText, arg13, arg11, chatGroup, 0)
-					message = format(globalstring, playerLink)
-				end
 			else
+				-- The client builds BNplayer toasts natively (FrameXML/ChatFrame.lua),
+				-- there is no C_BattleNet/BNet_GetValidatedCharacterName on Wrath.
 				local linkDisplayText = format(noBrackets and '%s' or '[%s]', arg2)
-				local playerLink = CH:GetBNPlayerLink(arg2, linkDisplayText, arg13, arg11, chatGroup, 0)
+				local playerLink = FormatLink("BNplayer", linkDisplayText, arg2, arg13 or 0, arg11 or 0, GetChatCategory(chatType), 0)
 				message = format(globalstring, playerLink)
 			end
 
@@ -1057,7 +1043,7 @@ function CT:ChatFrame_MessageEventHandler(frame, event, arg1, arg2, arg3, arg4, 
 				arg1 = RemoveNewlines(RemoveExtraSpaces(arg1))
 
 				local linkDisplayText = format(noBrackets and '%s' or '[%s]', arg2)
-				local playerLink = CH:GetBNPlayerLink(arg2, linkDisplayText, arg13, arg11, chatGroup, 0)
+				local playerLink = GetPlayerLink(arg2, linkDisplayText, arg11, chatGroup, chatTarget)
 				frame:AddMessage(format(_G.BN_INLINE_TOAST_BROADCAST, playerLink, arg1), info.r, info.g, info.b, info.id, nil, nil, nil, nil, nil, isHistory, historyTime)
 			end
 		elseif chatType == 'BN_INLINE_TOAST_BROADCAST_INFORM' then
@@ -1089,8 +1075,8 @@ function CT:ChatFrame_MessageEventHandler(frame, event, arg1, arg2, arg3, arg4, 
 				PlaySoundFile(LSM:Fetch('sound', alertType), 'Master')
 			end
 
-			local accessID = CH:GetAccessID(chatGroup, chatTarget)
-			local typeID = CH:GetAccessID(infoType, chatTarget, arg12 or arg13)
+			local accessID = _G.ChatHistory_GetAccessID(chatGroup, chatTarget)
+			local typeID = _G.ChatHistory_GetAccessID(infoType, chatTarget, arg12 or arg13)
 			local body = isChatLineCensored and arg1 or CT:MessageFormatter(frame, info, chatType, chatGroup, chatTarget, channelLength, coloredName, historySavedName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, isHistory, historyTime, historyName, historyBTag)
 
 			frame:AddMessage(body, info.r, info.g, info.b, info.id, accessID, typeID, event, eventArgs, msgFormatter, isHistory, historyTime)
@@ -1128,6 +1114,10 @@ function CT:MessageFormatter(frame, info, chatType, chatGroup, chatTarget, chann
 		return
 	end
 
+	if arg1 == nil then
+		return -- no message payload (see ChatFrame_MessageEventHandler guard)
+	end
+
 	local isProtected = CH:MessageIsProtected(arg1)
 	local bossMonster = strsub(chatType, 1, 9) == 'RAID_BOSS' or strsub(chatType, 1, 7) == 'MONSTER'
 	if not isProtected then
@@ -1141,18 +1131,14 @@ function CT:MessageFormatter(frame, info, chatType, chatGroup, chatTarget, chann
 		arg1 = RemoveExtraSpaces(arg1) -- Replace all instances of 5+ spaces with only 4 spaces
 
 		-- Search for icon links and replace them with texture links.
-		-- If arg17 is true, don't convert to raid icons
-		if _G.ChatFrameUtil and _G.ChatFrameUtil.CanChatGroupPerformExpressionExpansion then
-			arg1 = CH:ChatFrame_ReplaceIconAndGroupExpressions(arg1, arg17, not _G.ChatFrameUtil.CanChatGroupPerformExpressionExpansion(chatGroup))
-		else
-			arg1 = CH:ChatFrame_ReplaceIconAndGroupExpressions(arg1, arg17, not _G.ChatFrame_CanChatGroupPerformExpressionExpansion(chatGroup))
-		end
+		-- If arg17 is true, don't convert to raid icons. ElvUI 9.05's implementation
+		-- only takes (message, noIconReplacement); group-expression expansion flags
+		-- are retail-only and absent on Wrath.
+		arg1 = CH:ChatFrame_ReplaceIconAndGroupExpressions(arg1, arg17)
 	end
 
-	-- ElvUI: Get class colored name for BattleNet friend
-	if chatType == 'BN_WHISPER' or chatType == 'BN_WHISPER_INFORM' then
-		coloredName = historySavedName or CH:GetBNFriendColor(arg2, arg13)
-	end
+	-- Wrath BN whispers carry no separate friend color; keep the colored name
+	-- computed by the event handler (CH:GetBNFriendColor is retail-only).
 
 	-- ElvUI: data from populated guid info
 	local nameWithRealm, realm
@@ -1176,25 +1162,16 @@ function CT:MessageFormatter(frame, info, chatType, chatGroup, chatTarget, chann
 	end
 
 	local playerName = (nameWithRealm ~= arg2 and nameWithRealm) or arg2
-	if chatType == 'COMMUNITIES_CHANNEL' then -- isCommunityType
-		local messageInfo, clubId, streamId = C_Club_GetInfoFromLastCommunityChatLine()
-		if messageInfo and E:NotSecretValue(arg13) then
-			if arg13 and arg13 ~= 0 then -- isBattleNetCommunity: arg13 is bnetIDAccount
-				playerLink = GetBNPlayerCommunityLink(playerName, playerLinkDisplayText, arg13, clubId, streamId, messageInfo.messageId.epoch, messageInfo.messageId.position)
-			else
-				playerLink = GetPlayerCommunityLink(playerName, playerLinkDisplayText, clubId, streamId, messageInfo.messageId.epoch, messageInfo.messageId.position)
-			end
-		else
-			playerLink = playerLinkDisplayText
-		end
-	elseif chatType == 'BN_WHISPER' or chatType == 'BN_WHISPER_INFORM' then -- arg11: lineID
-		playerLink = CH:GetBNPlayerLink(playerName, playerLinkDisplayText, arg13, arg11, chatGroup, chatTarget)
+	if chatType == 'BN_WHISPER' or chatType == 'BN_WHISPER_INFORM' then -- arg11: lineID, arg13: presenceID
+		-- Wrath has no BN-account player links; the client itself formats
+		-- BN whispers as |HBNplayer:name:presenceID:lineID:chatType:chatTarget|h.
+		playerLink = FormatLink("BNplayer", playerLinkDisplayText, playerName, arg13 or 0, arg11 or 0, chatGroup, chatTarget or 0)
 	else
-		playerLink = CH:GetPlayerLink(playerName, playerLinkDisplayText, arg11, chatGroup, chatTarget)
+		playerLink = GetPlayerLink(playerName, playerLinkDisplayText, arg11, chatGroup, chatTarget)
 	end
 
-	local isMobile = arg14 and GetMobileEmbeddedTexture(info.r, info.g, info.b)
-	local message = format('%s%s', isMobile or '', arg1)
+	-- Wrath has no mobile chat (no GetMobileEmbeddedTexture).
+	local message = arg1
 
 	-- Player Flags
 	local pflag = CH:GetPFlag(arg6, arg7, arg12)
@@ -1595,36 +1572,32 @@ local function getElementNumberOfTable(t)
 end
 
 local function UpdateBattleNetFriendStatus(friendIndex)
-	local friendInfo = friendIndex and C_BattleNet_GetFriendAccountInfo(friendIndex)
-	if not friendInfo then
+	-- Wrath native: one toon per Battle.net friend (BNGetFriendInfo/BNGetToonInfo).
+	local presenceID, givenName, surname, toonName, toonID, client, isOnline = BNGetFriendInfo(friendIndex)
+	if not presenceID or presenceID == 0 then
 		return
 	end
 
-	local savedCharacters = battleNetFriendsCharacters[friendInfo.bnetAccountID]
+	local savedCharacters = battleNetFriendsCharacters[presenceID]
 	local numberOfSavedCharacters = getElementNumberOfTable(savedCharacters)
 	local characters = {}
 	local numberOfCharacters = 0
 
-	if battleNetFriendStatusUpdateTime[friendInfo.bnetAccountID] then
-		local timeSinceLastUpdate = time() - battleNetFriendStatusUpdateTime[friendInfo.bnetAccountID]
+	if battleNetFriendStatusUpdateTime[presenceID] then
+		local timeSinceLastUpdate = time() - battleNetFriendStatusUpdateTime[presenceID]
 		if timeSinceLastUpdate < 2 then
 			return
 		end
 	end
 
-	local numGameAccounts = C_BattleNet_GetFriendNumGameAccounts(friendIndex)
-	if numGameAccounts and numGameAccounts > 0 then
-		for accountIndex = 1, numGameAccounts do
-			local gameAccountInfo = C_BattleNet_GetFriendGameAccountInfo(friendIndex, accountIndex)
-			if gameAccountInfo.wowProjectID == WOW_PROJECT_MAINLINE and gameAccountInfo.characterName then
-				numberOfCharacters = numberOfCharacters + 1
-				characters[gameAccountInfo.characterName] = {
-					faction = gameAccountInfo.factionName,
-					realm = gameAccountInfo.realmName,
-					class = E:UnlocalizedClassName(gameAccountInfo.className),
-				}
-			end
-		end
+	if isOnline and toonName and toonName ~= "" and client == _G.BNET_CLIENT_WOW then
+		local _, _, _, realmName, faction, _, class = BNGetToonInfo(toonID)
+		numberOfCharacters = 1
+		characters[toonName] = {
+			faction = _G.PLAYER_FACTION_GROUP[faction],
+			realm = realmName,
+			class = E:UnlocalizedClassName(class),
+		}
 	end
 
 	local changed, changedCharacters
@@ -1666,120 +1639,98 @@ local function UpdateBattleNetFriendStatus(friendIndex)
 		end
 	end
 
-	battleNetFriendsCharacters[friendInfo.bnetAccountID] = characters
-	battleNetFriendStatusUpdateTime[friendInfo.bnetAccountID] = time()
-	return changed, friendInfo.accountName, friendInfo.bnetAccountID, changedCharacters
+	battleNetFriendsCharacters[presenceID] = characters
+	battleNetFriendStatusUpdateTime[presenceID] = time()
+	local accountName = givenName and format("%s %s", givenName, surname or "") or _G.UNKNOWN
+	return changed, accountName, presenceID, changedCharacters
 end
 
-local guildClubId
-
-local function CacheGuildMemberFromClub(memberId)
-	if not guildClubId then
+-- Wrath native guild roster cache (replaces the retail C_Club/community path).
+local function CacheGuildRoster()
+	if not IsInGuild() then
 		return
 	end
 
-	local info = C_Club_GetMemberInfo(guildClubId, memberId)
-	if info and info.name and info.classID then
-		local classInfo = C_CreatureInfo_GetClassInfo(info.classID)
-		if classInfo then
-			guildPlayerCache[Ambiguate(info.name, "none")] = classInfo.classFile
+	local totalMembers = GetNumGuildMembers()
+	if not totalMembers or totalMembers == 0 then
+		return
+	end
+
+	for index = 1, totalMembers do
+		local name, _, _, _, _, _, _, _, _, _, classFileName = GetGuildRosterInfo(index)
+		if name and classFileName then
+			guildPlayerCache[Ambiguate(name, "none")] = classFileName
 		end
 	end
 end
 
-function CT:INITIAL_CLUBS_LOADED()
-	guildClubId = C_Club_GetGuildClubId()
-	if not guildClubId then
-		return
-	end
-
-	local memberIds = C_Club_GetClubMembers(guildClubId)
-	if E:NotSecretValue(memberIds) and memberIds and type(memberIds) == "table" and #memberIds > 0 then
-		for _, memberId in ipairs(memberIds) do
-			CacheGuildMemberFromClub(memberId)
-		end
-	end
-
-	self:UnregisterEvent("INITIAL_CLUBS_LOADED")
+function CT:GUILD_ROSTER_UPDATE()
+	CacheGuildRoster()
 end
 
-function CT:CLUB_MEMBER_PRESENCE_UPDATED(_, clubId, memberId)
-	if not guildClubId then
-		guildClubId = C_Club_GetGuildClubId()
-	end
-
-	if clubId == guildClubId then
-		CacheGuildMemberFromClub(memberId)
-	end
-end
-
-function CT:BN_FRIEND_INFO_CHANGED(_, friendIndex, appTexture, noRetry)
-	if not appTexture and not noRetry then
-		GetTitleIconTexture("App", TitleIconVersion_Small, function(success, texture)
-			if success then
-				self:BN_FRIEND_INFO_CHANGED(_, friendIndex, texture, true)
-			end
-		end)
-
-		return
-	end
-
+function CT:BN_FRIEND_INFO_CHANGED()
 	if not self.bnetFriendDataCached or not (self.db.bnetFriendOnline or self.db.bnetFriendOffline) then
 		return
 	end
 
-	local changed, accountName, accountID, characters = UpdateBattleNetFriendStatus(friendIndex)
-	if not changed then
-		return
+	-- The Wrath event carries no friend index; scan every friend like the client does.
+	for friendIndex = 1, BNGetNumFriends() do
+		local changed, accountName, accountID, characters = UpdateBattleNetFriendStatus(friendIndex)
+		if changed then
+		self:HandleBattleNetFriendStatus(accountName, accountID, characters)
+		end
 	end
+end
 
-	local appTextureString = appTexture and GetClientTexture(appTexture, 16, 16, 12) .. " " or ""
-	local displayAccountName = appTextureString .. format("|cff82c5ff%s|r", accountName)
-	local bnetLink = GetBNPlayerLink(accountName, displayAccountName, accountID, 0, 0, 0)
+function CT:HandleBattleNetFriendStatus(accountName, accountID, characters)
+		local displayAccountName = format("|cff82c5ff%s|r", accountName)
+		-- The client has no GetBNPlayerLink global; build the BNplayer link the same
+		-- way FrameXML/ChatFrame.lua does: name:presenceID:lineid:chatType:chatTarget.
+		local bnetLink = FormatLink("BNplayer", displayAccountName, accountName, accountID or 0, 0, 0, 0)
 
-	local onlineCharacters = {}
-	local offlineCharacters = {}
+		local onlineCharacters = {}
+		local offlineCharacters = {}
 
-	---@diagnostic disable-next-line: param-type-mismatch
-	for character, characterData in pairs(characters) do
-		local fullName = characterData.data.realm and format("%s-%s", character, characterData.data.realm) or character
+		---@diagnostic disable-next-line: param-type-mismatch
+		for character, characterData in pairs(characters) do
+			local fullName = characterData.data.realm and format("%s-%s", character, characterData.data.realm) or character
 
-		-- to avoid duplicate message
-		if not guildPlayerCache[Ambiguate(fullName, "none")] then
-			local classIcon = self.db.classIcon
-				and F.GetClassIconStringWithStyle(characterData.data.class, CT.db.classIconStyle, 16, 16)
-			classIcon = classIcon and classIcon .. " " or ""
-			local coloredName = C.StringWithClassColor(character, characterData.data.class)
+			-- to avoid duplicate message
+			if not guildPlayerCache[Ambiguate(fullName, "none")] then
+				local classIcon = self.db.classIcon
+					and F.GetClassIconStringWithStyle(characterData.data.class, CT.db.classIconStyle, 16, 16)
+				classIcon = classIcon and classIcon .. " " or ""
+				local coloredName = C.StringWithClassColor(character, characterData.data.class)
 
-			local playerName = coloredName
-				and format("|Hplayer:%s|h%s%s|h", fullName, classIcon, self:MayHaveBrackets(coloredName))
+				local playerName = coloredName
+					and format("|Hplayer:%s|h%s%s|h", fullName, classIcon, self:MayHaveBrackets(coloredName))
 
-			if self.db.factionIcon then
-				local factionIcon =
-					F.GetIconString(factionTextures[characterData.data.faction] or factionTextures["Neutral"], 18)
-				playerName = playerName and factionIcon and format("%s %s", factionIcon, playerName) or playerName
-			end
+				if self.db.factionIcon then
+					local factionIcon =
+						F.GetIconString(factionTextures[characterData.data.faction] or factionTextures["Neutral"], 18)
+					playerName = playerName and factionIcon and format("%s %s", factionIcon, playerName) or playerName
+				end
 
-			if playerName then
-				tinsert(
-					characterData.type == "online" and onlineCharacters or offlineCharacters,
+				if playerName then
+					tinsert(
+						characterData.type == "online" and onlineCharacters or offlineCharacters,
 					AddSpaceForAsianText(playerName)
-				)
+					)
+				end
 			end
 		end
-	end
 
-	local function sendMessage(template, players, ...)
-		local message = gsub(template, "%%players%%", players)
-		message = gsub(message, "%%bnet%%", bnetLink)
+		local function sendMessage(template, players, ...)
+			local message = gsub(template, "%%players%%", players)
+			message = gsub(message, "%%bnet%%", bnetLink)
 
-		for i = 1, Constants_ChatFrameConstants_MaxChatWindows do
-			local chatFrame = _G["ChatFrame" .. i]
-			if chatFrame and chatFrame:IsEventRegistered("CHAT_MSG_BN_INLINE_TOAST_ALERT") then
-				chatFrame:AddMessage(message, ...)
+			for i = 1, Constants_ChatFrameConstants_MaxChatWindows do
+				local chatFrame = _G["ChatFrame" .. i]
+				if chatFrame and chatFrame:IsEventRegistered("CHAT_MSG_BN_INLINE_TOAST_ALERT") then
+					chatFrame:AddMessage(message, ...)
+				end
 			end
 		end
-	end
 
 	if #onlineCharacters > 0 and self.db.bnetFriendOnline then
 		sendMessage(
@@ -1803,8 +1754,9 @@ function CT:PLAYER_ENTERING_WORLD(event)
 		UpdateBattleNetFriendStatus(friendIndex)
 	end
 
-	if C_Club_GetGuildClubId() then
-		self:INITIAL_CLUBS_LOADED()
+	if IsInGuild() then
+		GuildRoster()
+		CacheGuildRoster()
 	end
 
 	self.bnetFriendDataCached = true
@@ -1822,9 +1774,7 @@ function CT:Initialize()
 	self:CheckLFGRoles()
 
 	self:RegisterEvent("PLAYER_ENTERING_WORLD")
-	self:RegisterEvent("INITIAL_CLUBS_LOADED")
-	self:RegisterEvent("CLUB_MEMBER_PRESENCE_UPDATED")
-	self:RegisterEvent("CLUB_MEMBER_ADDED", "CLUB_MEMBER_PRESENCE_UPDATED")
+	self:RegisterEvent("GUILD_ROSTER_UPDATE")
 	self:RegisterEvent("BN_FRIEND_INFO_CHANGED")
 end
 

@@ -73,8 +73,14 @@ local tostring = tostring
 local setmetatable = setmetatable
 local SpellBookSpellBank = _G.Enum and _G.Enum.SpellBookSpellBank or {}
 local BOOKTYPE_SPELL = BOOKTYPE_SPELL or SpellBookSpellBank.Player or "player"
-local GetSpellBookItemName = GetSpellBookItemName or (C_SpellBook and C_SpellBook.GetSpellBookItemName)
+local GetSpellBookItemName = GetSpellBookItemName or (C_SpellBook and C_SpellBook.GetSpellBookItemName) or function(index, spellBank)
+  if C_SpellBook and C_SpellBook.GetSpellBookItemName then return C_SpellBook.GetSpellBookItemName(index, spellBank) end
+  return nil
+end
+local GetSpellBookItemInfo = GetSpellBookItemInfo or (C_SpellBook and C_SpellBook.GetSpellBookItemInfo)
 local C_Item = C_Item
+local LegacyGetItemInfo = GetItemInfo
+local LegacyIsItemInRange = IsItemInRange
 local C_Map = C_Map
 local C_Timer = C_Timer
 local UnitCanAttack = UnitCanAttack
@@ -124,7 +130,7 @@ local GetSpellInfo = GetSpellInfo or function(spellID)
 end
 
 local GetNumSpellTabs = GetNumSpellTabs or (C_SpellBook and C_SpellBook.GetNumSpellBookSkillLines) or function() return 0 end
-local GetSpellTabInfo = GetSpellTabInfo or function(index)
+local GetSpellTabInfo = GetSpellTabInfo or function() return nil end or function(index)
   local skillLineInfo = C_SpellBook and C_SpellBook.GetSpellBookSkillLineInfo and C_SpellBook.GetSpellBookSkillLineInfo(index);
   if skillLineInfo then
     return skillLineInfo.name,
@@ -3792,7 +3798,7 @@ local checkers_Item = setmetatable({}, {
       if not skipInCombatCheck and InCombatLockdownRestriction(unit) then
         return nil
       else
-        return C_Item and C_Item.IsItemInRange and C_Item.IsItemInRange(item, unit) or nil
+        return (C_Item and C_Item.IsItemInRange and C_Item.IsItemInRange(item, unit)) or (LegacyIsItemInRange and LegacyIsItemInRange(item, unit))
       end
     end
     t[item] = func
@@ -3850,7 +3856,10 @@ local function findSpellIdx(spellName)
     return nil
   end
   for i = 1, getNumSpells() do
-    local spell = GetSpellBookItemName(i, BOOKTYPE_SPELL)
+    if not GetSpellBookItemName or not GetSpellBookItemInfo then
+    return nil
+  end
+  local spell = GetSpellBookItemName(i, BOOKTYPE_SPELL)
     if spell == spellName then
       local spellType, spellID, spellInfo = GetSpellBookItemInfo(i, BOOKTYPE_SPELL)
       if spellInfo then -- new API output available
@@ -4169,7 +4178,7 @@ local function createSmartChecker(friendChecker, harmChecker, miscChecker)
 end
 
 local minItemChecker = function(item)
-  if C_Item and C_Item.GetItemInfo and C_Item.GetItemInfo(item) then
+  if ((C_Item and C_Item.GetItemInfo and C_Item.GetItemInfo(item)) or (LegacyGetItemInfo and LegacyGetItemInfo(item))) then
     return function(unit)
       return C_Item.IsItemInRange and C_Item.IsItemInRange(item, unit)
     end
@@ -4523,12 +4532,12 @@ function lib:processItemRequests(itemRequests)
       if not i then
         itemRequests[range] = nil
         break
-      elseif Item:CreateFromItemID(item):IsItemEmpty() or self.failedItemRequests[item] then
+      elseif ((Item and Item.CreateFromItemID and Item:CreateFromItemID(item):IsItemEmpty()) or self.failedItemRequests[item]) then
         -- print("### processItemRequests: failed: " .. tostring(item))
         tremove(items, i)
       elseif pendingItemRequest[item] and GetTime() < itemRequestTimeoutAt[item] then
         return true -- still waiting for server response
-      elseif C_Item and C_Item.GetItemInfo and C_Item.GetItemInfo(item) then
+      elseif ((C_Item and C_Item.GetItemInfo and C_Item.GetItemInfo(item)) or (LegacyGetItemInfo and LegacyGetItemInfo(item))) then
         -- print("### processItemRequests: found: " .. tostring(item))
         foundNewItems = true
         itemRequestTimeoutAt[item] = nil
@@ -4982,7 +4991,7 @@ function lib:activate()
     self.cacheResetTimer = nil
     return
   end
-  self.cacheResetTimer = C_Timer and C_Timer.NewTicker and C_Timer.NewTicker(5, function()
+  self.cacheResetTimer = C_Timer and C_Timer.NewTicker and C_Timer.NewTicker(C_Timer, 5, function()
       invalidateRangeCache(5)
     end)
   end

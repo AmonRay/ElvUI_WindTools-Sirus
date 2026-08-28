@@ -12,10 +12,15 @@ local BNConnected = BNConnected
 local FriendsFrame_Update = FriendsFrame_Update
 local GetClassInfo = GetClassInfo
 local GetQuestDifficultyColor = GetQuestDifficultyColor
-local TimerunningUtil_AddSmallIcon = TimerunningUtil.AddSmallIcon
+local TimerunningUtil = _G.TimerunningUtil
+local TimerunningUtil_AddSmallIcon = TimerunningUtil and TimerunningUtil.AddSmallIcon or function() return "" end
 
 local C_BattleNet_GetFriendAccountInfo = C_BattleNet and C_BattleNet.GetFriendAccountInfo or function() return nil end
-local C_ClassColor_GetClassColor = C_ClassColor and C_ClassColor.GetClassColor or function() return { r = 1, g = 1, b = 1 } end
+local C_ClassColor_GetClassColor = C_ClassColor and C_ClassColor.GetClassColor or function(class)
+	-- Native 3.3.5a: GetClassColor(classFile) returns positional r,g,b.
+	local r, g, b = GetClassColor(class)
+	return { r = r or 1, g = g or 1, b = b or 1 }
+end
 local C_FriendList_GetFriendInfoByIndex = C_FriendList and C_FriendList.GetFriendInfoByIndex or GetFriendInfo or function() return nil end
 
 local BNET_FRIEND_TOOLTIP_WOW_CLASSIC = BNET_FRIEND_TOOLTIP_WOW_CLASSIC
@@ -30,7 +35,7 @@ local LOCALIZED_CLASS_NAMES_FEMALE = LOCALIZED_CLASS_NAMES_FEMALE
 local LOCALIZED_CLASS_NAMES_MALE = LOCALIZED_CLASS_NAMES_MALE
 local WOW_PROJECT_BURNING_CRUSADE_CLASSIC = 5
 local WOW_PROJECT_CLASSIC = 2
-local WOW_PROJECT_MAINLINE = WOW_PROJECT_MAINLINE
+local WOW_PROJECT_MAINLINE = WOW_PROJECT_MAINLINE or 1
 local WOW_PROJECT_WRATH_CLASSIC = 11
 local WOW_PROJECT_CATACLYSM_CLASSIC = 14
 local WOW_PROJECT_MISTS_CLASSIC = 19
@@ -549,7 +554,11 @@ function FL:Initialize()
 
 	self.db = E.db.WT.social.friendList
 
-	self:SecureHook("FriendsFrame_UpdateFriendButton", "UpdateFriendButton")
+	-- FriendsFrame_UpdateFriendButton is a retail-only global; on 3.3.5a the list
+	-- is redrawn wholesale by FriendsFrame_Update. Hook whichever the client has.
+	if _G.FriendsFrame_UpdateFriendButton then
+		self:SecureHook("FriendsFrame_UpdateFriendButton", "UpdateFriendButton")
+	end
 	if _G.RecentAlliesFrame and _G.RecentAlliesFrame.List and _G.RecentAlliesFrame.List.ScrollBox then
 		self:SecureHook(_G.RecentAlliesFrame.List.ScrollBox, "Update", function(scrollBox)
 			scrollBox:ForEachFrame(function(button)

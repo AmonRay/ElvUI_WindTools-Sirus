@@ -635,13 +635,8 @@ V.skins = {
 			useCustomColor = false,
 		},
 	},
-	damageMeter = {
+	details = {
 		enable = true,
-		windowBackdrop = "always", ---@type "always"|"mouseover"|"hide"
-		headerPart = "always", ---@type "always"|"mouseover"
-		headerBackdrop = "hide", ---@type "always"|"hide"
-		scrollBar = "default", ---@type "hide"|"default"|"mouseover"
-		fadeTime = 0.2,
 		bar = {
 			texture = "WindTools Glow",
 			alpha = 1,
@@ -671,6 +666,7 @@ V.skins = {
 		btWQuests = true,
 		bugSack = true,
 		collectionator = true,
+		details = true,
 		extraQuestButton = true,
 		handyNotesMapNotes = true,
 		immersion = true,

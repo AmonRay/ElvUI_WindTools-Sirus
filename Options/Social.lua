@@ -17,7 +17,7 @@ local customListSelected
 local CB = W:GetModule("ChatBar")
 local CL = W:GetModule("ChatLink")
 local CT = W:GetModule("ChatText")
-local WE = W:GetModule("Emote")
+local WE = W:GetModule("Emote", true) or {}
 local FL = W:GetModule("FriendList")
 local CM = W:GetModule("ContextMenu")
 local ST = W:GetModule("SmartTab")
@@ -906,15 +906,20 @@ local SampleStrings = {}
 
 do
 	local icons = ""
-	icons = icons .. E:TextureString(CT.cache.elvuiRoleIconsPath.Tank, ":16:16:0:0:64:64:2:56:2:56") .. " "
-	icons = icons .. E:TextureString(CT.cache.elvuiRoleIconsPath.Healer, ":16:16:0:0:64:64:2:56:2:56") .. " "
-	icons = icons .. E:TextureString(CT.cache.elvuiRoleIconsPath.DPS, ":16:16")
+	local roleIcons = CT.cache and CT.cache.elvuiRoleIconsPath or {}
+	local tankIcon = roleIcons.Tank or "Interface\\\\LFGFrame\\\\UI-LFG-ICON-PORTRAITROLES"
+	local healerIcon = roleIcons.Healer or tankIcon
+	local dpsIcon = roleIcons.DPS or tankIcon
+	icons = icons .. E:TextureString(tankIcon, ":16:16:0:0:64:64:2:56:2:56") .. " "
+	icons = icons .. E:TextureString(healerIcon, ":16:16:0:0:64:64:2:56:2:56") .. " "
+	icons = icons .. E:TextureString(dpsIcon, ":16:16")
 	SampleStrings.ELVUI = icons
 
 	icons = ""
-	icons = icons .. CT.cache.blizzardRoleIcons.Tank .. " "
-	icons = icons .. CT.cache.blizzardRoleIcons.Healer .. " "
-	icons = icons .. CT.cache.blizzardRoleIcons.DPS
+	local blizzardRoleIcons = CT.cache and CT.cache.blizzardRoleIcons or {}
+	icons = icons .. (blizzardRoleIcons.Tank or "") .. " "
+	icons = icons .. (blizzardRoleIcons.Healer or "") .. " "
+	icons = icons .. (blizzardRoleIcons.DPS or "")
 	SampleStrings.BLIZZARD = icons
 
 	for _, pack in ipairs({ "FFXIV", "PHILMOD", "HEXAGON", "SUNUI", "LYNUI", "ELVUI_OLD", "DEFAULT" }) do
@@ -1447,7 +1452,7 @@ options.emote = {
 	end,
 	set = function(info, value)
 		E.db.WT.social.emote[info[#info]] = value
-		WE:ProfileUpdate()
+		if WE.ProfileUpdate then WE:ProfileUpdate() end
 	end,
 	args = {
 		desc = {

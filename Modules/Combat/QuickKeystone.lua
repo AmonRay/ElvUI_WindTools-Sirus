@@ -7,7 +7,7 @@ local C_AddOns_IsAddOnLoaded = W.Compatibility.IsAddOnLoaded
 local C_Container_GetContainerItemID = W.Compatibility.GetContainerItemID
 local C_Container_GetContainerNumSlots = W.Compatibility.GetContainerNumSlots
 local C_Container_UseContainerItem = W.Compatibility.UseContainerItem
-local C_Item_IsItemKeystoneByID = C_Item and C_Item.IsItemKeystoneByID or function() return false end
+local C_Item_IsItemKeystoneByID = W.Compatibility.IsItemKeystoneByID
 
 local NUM_BAG_SLOTS = NUM_BAG_SLOTS
 

@@ -97,9 +97,9 @@ W.Utilities = {}
 W.ModuleRequirements = {
 	PreyHunt = { "HasModernQuestAPI", "HasModernMapAPI" },
 	SuperTracker = { "HasModernMapAPI" },
-	DamageMeterLayout = { "HasChallengeModeAPI" },
 	MythicPlus = { "HasChallengeModeAPI", "HasMythicPlusAPI" },
 	ObjectiveProgress = { "HasModernQuestAPI" },
+	AchievementTracker = { "HasScrollBoxAPI" },
 	Icons = { "HasTooltipDataProcessor" },
 	ReshiiWrapsUpgrade = { "HasTooltipDataProcessor" },
 	HideCrafter = { "HasTooltipDataProcessor" },
@@ -108,12 +108,24 @@ W.ModuleRequirements = {
 	Progression = { "HasModernCollectionsAPI" },
 }
 
+-- Core/Load_Core.xml is evaluated after this file on the legacy client. The
+-- compatibility layer is loaded there, so keep this pre-registration inert.
+-- Initialize.lua must not dereference it before Core/CompatibilityLayer.lua.
+W.Compatibility = W.Compatibility or {}
+W.Compatibility.HasLegacyQuestAPI = type(GetNumQuestLogEntries) == "function"
+W.Compatibility.HasModernSpellAPI = type(_G.C_Spell) == "table"
+W.Compatibility.HasModernMapAPI = type(_G.C_Map) == "table"
+
 -- Pre-register libs into ElvUI
 E:AddLib("Deflate", "LibDeflate")
 E.Libs.Deflate.compressLevel = { level = 5 }
 -- LibOpenRaid is retail-only until its Wrath data model is verified in the modified client.
-if not (W.Compatibility.HasLegacyQuestAPI and not W.Compatibility.HasModernSpellAPI and not W.Compatibility.HasModernMapAPI) then
-	E:AddLib("OpenRaid", "LibOpenRaid-1.0")
+-- Never call E:AddLib unless the library was actually loaded by the XML file.
+if not (type(W.Compatibility) == "table" and W.Compatibility.HasLegacyQuestAPI and not W.Compatibility.HasModernSpellAPI and not W.Compatibility.HasModernMapAPI) then
+	local openRaid = E.Libs.OpenRaid or (LibStub and LibStub("LibOpenRaid-1.0", true))
+	if openRaid then
+		E.Libs.OpenRaid = openRaid
+	end
 end
 E:AddLib("ObjectiveProgressWT", "LibObjectiveProgress-WT")
 E:AddLib("RangeCheck", "LibRangeCheck-3.0")
@@ -147,8 +159,8 @@ function W:Initialize()
 	EP:RegisterPlugin(addonName, W.OptionsCallback, false, xVersionString)
 
 	self:SecureHook(E, "UpdateAll", "UpdateModules")
-	self:RegisterEvent("PLAYER_ENTERING_WORLD")
 	-- Init Modules
+	self:RegisterEvent("PLAYER_ENTERING_WORLD")
 	self:RegisterEvent("PLAYER_LOGIN")
 end
 
@@ -173,13 +185,75 @@ function W:AutoCopyPrivateProfile()
 end
 
 do
+	-- Legacy Sirus/ElvUI profiles can persist color tables that only contain an
+	-- alpha channel (e.g. ["bordercolor"] = {["a"] = 1}). E:SetColorTable throws
+	-- on missing RGB channels, which aborts E:UpdateMedia and leaves
+	-- E.media.bordercolor/backdropcolor nil. Every subsequent SetTemplate /
+	-- HandleButton then calls SetBackdropBorderColor(nil, nil, nil), which falls
+	-- back to the WoW default white border on all frames. Fill the missing
+	-- channels from the ElvUI defaults before refreshing the media.
+	local function RepairElvUIColorTables()
+		local db = E.db
+		local general = db and db.general
+		if not general then
+			return
+		end
+
+		local defaults = E.DF and E.DF.profile and E.DF.profile.general
+
+		local function repair(tbl, key)
+			local value = tbl and tbl[key]
+			if type(value) ~= "table" or (value.r and value.g and value.b) then
+				return
+			end
+
+			local fallback = defaults and defaults[key]
+			value.r = value.r or (fallback and fallback.r) or 0
+			value.g = value.g or (fallback and fallback.g) or 0
+			value.b = value.b or (fallback and fallback.b) or 0
+		end
+
+		repair(general, "bordercolor")
+		repair(general, "backdropcolor")
+		repair(general, "backdropfadecolor")
+		repair(general, "valuecolor")
+		repair(general.customGlow, "color")
+
+		local unitframe = db and db.unitframe
+		repair(unitframe and unitframe.colors, "borderColor")
+	end
+
 	local checked = false
 	function W:PLAYER_ENTERING_WORLD(_, isInitialLogin, isReloadingUi)
 		if isInitialLogin then
 			self:AutoCopyPrivateProfile()
-			E:UpdateMedia()
-			E:UpdateFontTemplates()
+		end
+
+		RepairElvUIColorTables()
+
+		if E.media and E.media.bordercolor and E.media.bordercolor.r then
+			if isInitialLogin then
+				E:UpdateMedia()
+				E:UpdateFontTemplates()
+			end
+		else
+			-- E:UpdateMedia() aborted during ElvUI initialization because of an
+			-- incomplete legacy color table. After the repair above, refresh the
+			-- media and recolor the already-created template frames.
+			if E.UpdateMediaItems then
+				E:UpdateMediaItems()
+			else
+				E:UpdateMedia()
+			end
+		end
+
+		if isInitialLogin then
 			E:Delay(6, self.ChangelogReadAlert, self)
+			-- Queue the native ElvUI plugin installer on the first login when the
+			-- WindTools setup has not been completed yet.
+			if W.Install and W.Install.CheckInstall then
+				W.Install:CheckInstall()
+			end
 			if E.global.WT.core.loginMessage then
 				local icon = addon[2].GetIconString(self.Media.Textures.smallLogo, 14)
 				print(

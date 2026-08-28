@@ -27,6 +27,12 @@ local unpack = unpack
 
 local GenerateClosure = GenerateClosure
 local PlaySoundFile = PlaySoundFile
+local function safeDelay(delay, callback, ...)
+	if type(callback) ~= "function" then return end
+	if type(E.Delay) == "function" then
+		return E:Delay(delay, callback, ...)
+	end
+end
 
 ---ElvUI FontTemplate expects an LSM font name; file paths must use SetFont + SetFontShadow.
 ---@param font any
@@ -88,7 +94,7 @@ end
 ---@param size number?
 ---@param style string?
 function F.FontTemplate(text, font, size, style)
-	if not text or not text.GetFont then
+	if not text or type(text.GetFont) ~= "function" then
 		F.Developer.LogDebug("Functions.FontTemplate: text not found")
 		return
 	end
@@ -98,8 +104,32 @@ function F.FontTemplate(text, font, size, style)
 	if isFontPath(font) then
 		applyFontPath(text, font, size, style)
 	else
-		-- ElvUI FontTemplate arg1 is an LSM name; it Fetch()s internally.
+		-- Sirus 3.3.5a ElvUI FontTemplate passes the name straight to SetFont
+		-- (it does not Fetch() from LSM), so resolve LSM font names to real
+		-- file paths here; unknown names fall through to the ElvUI default.
+		if font then
+			local fontPath = LSM:Fetch("font", font)
+			-- Profiles imported from retail may store the unsuffixed name
+			-- while this client only registered the locale-suffixed variant.
+			if not fontPath and W.CompatibleFont then
+				fontPath = LSM:Fetch("font", font .. " (en)")
+			end
+			if fontPath then
+				font = fontPath
+			end
+		end
 		text:FontTemplate(font, size, style)
+	end
+
+	-- Wrath FontStrings have no default font: calling SetText on one without
+	-- a font raises "<unnamed>:SetText(): Font not set". If nothing was
+	-- applied above (unknown LSM name or missing font file), fall back to
+	-- ElvUI's default font so the FontString is always usable. String sizes
+	-- (relative adjustments) are only valid for SetFont, not for a path.
+	local ok, currentFontPath = pcall(text.GetFont, text)
+	if ok and not currentFontPath then
+		local fallbackSize = type(size) == "number" and size or nil
+		applyFontPath(text, E.media.normFont, fallbackSize, style)
 	end
 
 	if text.SetJustifyH and text.GetJustifyH and justifyHBefore and justifyHBefore ~= text:GetJustifyH() then
@@ -113,7 +143,7 @@ end
 ---@param text FontString|SimpleFontString The FontString object to modify
 ---@param db table Font style database containing name, size, and style
 function F.SetFontWithDB(text, db)
-	if not text or not text.GetFont then
+	if not text or type(text.GetFont) ~= "function" then
 		F.Developer.LogDebug("Functions.SetFontWithDB: text not found")
 		return
 	end
@@ -123,15 +153,29 @@ function F.SetFontWithDB(text, db)
 		return
 	end
 
-	local _, fontHeight = text:GetFont()
+	-- Some modified 3.3.5 clients expose GetFont on non-FrameScript
+	-- objects. Calling it there raises "Attempt to find 'this'"; only use
+	-- the method when the object is a real FontString and guard the call.
+	local ok, _, fontHeight = pcall(text.GetFont, text)
+	if not ok then
+		F.Developer.LogDebug("Functions.SetFontWithDB: invalid font object")
+		return
+	end
 	local fontSize = db.size or fontHeight
 	local fontStyle = db.style or "NONE"
 
 	if db.name then
 		F.FontTemplate(text, db.name, fontSize, fontStyle)
 	else
-		local currentFontPath = text:GetFont()
-		applyFontPath(text, currentFontPath, fontSize, fontStyle)
+		local ok, currentFontPath = pcall(text.GetFont, text)
+		if ok and currentFontPath then
+			applyFontPath(text, currentFontPath, fontSize, fontStyle)
+		elseif ok then
+			-- Wrath FontStrings have no font until SetFont is called, so a
+			-- missing db.name must still apply a real font; otherwise the next
+			-- SetText raises "<unnamed>:SetText(): Font not set".
+			applyFontPath(text, E.media.normFont, fontSize, fontStyle)
+		end
 	end
 end
 
@@ -139,7 +183,7 @@ end
 ---@param text FontString|SimpleFontString The FontString object to modify
 ---@param db table Font color database containing r, g, b, a values
 function F.SetFontColorWithDB(text, db)
-	if not text or not text.GetFont then
+	if not text or type(text.GetFont) ~= "function" then
 		F.Developer.LogDebug("Functions.SetFontColorWithDB: text not found")
 		return
 	end
@@ -157,12 +201,16 @@ end
 ---@param size number|string? Font size or size change amount as string (optional)
 ---@param style string? Font outline style. (optional, default is "OUTLINE")
 function F.SetFont(text, font, size, style)
-	if not text or not text.GetFont then
+	if not text or type(text.GetFont) ~= "function" then
 		F.Developer.LogDebug("Functions.SetFont: text not found")
 		return
 	end
 
-	local currentFontPath, fontHeight = text:GetFont()
+	local ok, currentFontPath, fontHeight = pcall(text.GetFont, text)
+	if not ok then
+		F.Developer.LogDebug("Functions.SetFont: invalid font object")
+		return
+	end
 
 	if type(size) == "string" then
 		size = fontHeight + (tonumber(size) or 0)
@@ -394,7 +442,7 @@ function F.Throttle(duration, key, func, ...)
 		state.timer = nil
 	end
 
-	state.timer = E:Delay(duration, function()
+	state.timer = safeDelay(duration, function()
 		func(unpack(state.lastArgs))
 		state.isThrottling = false
 		state.timer = nil
@@ -445,7 +493,7 @@ function F.ThrottleFirst(duration, key, func, ...)
 		state.timer = nil
 	end
 
-	state.timer = E:Delay(duration, function()
+	state.timer = safeDelay(duration, function()
 		func(unpack(state.lastArgs))
 		state.isThrottling = false
 		state.timer = nil

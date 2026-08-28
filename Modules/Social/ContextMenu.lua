@@ -40,8 +40,6 @@ local C_ChatInfo_SendChatMessage = W.Compatibility.SendChatMessage or function()
 local C_Club_GetGuildClubId = C_Club and C_Club.GetGuildClubId or function() return nil end
 local C_FriendList_SendWho = C_FriendList and C_FriendList.SendWho or SendWho or function() end
 local C_GuildInfo_Invite = C_GuildInfo and C_GuildInfo.Invite or GuildInvite or function() end
-local C_SpecializationInfo_GetSpecialization = C_SpecializationInfo and C_SpecializationInfo.GetSpecialization or GetSpecialization or function() return nil end
-local C_SpecializationInfo_GetSpecializationInfo = C_SpecializationInfo and C_SpecializationInfo.GetSpecializationInfo or GetSpecializationInfo or function() return nil end
 local Menu_ModifyMenu = Menu.ModifyMenu
 
 local CR_VERSATILITY_DAMAGE_DONE = CR_VERSATILITY_DAMAGE_DONE
@@ -353,7 +351,7 @@ CM.Features = {
 			for i, message in ipairs({
 				format(
 					"(%s) %s: %.1f %s: %s",
-					select(2, C_SpecializationInfo_GetSpecializationInfo(C_SpecializationInfo_GetSpecialization()))
+					select(2, W.Compatibility.GetSpecializationInfo(W.Compatibility.GetSpecialization()))
 						.. select(1, UnitClass("player")),
 					ITEM_LEVEL_ABBR,
 					select(2, GetAverageItemLevel()),

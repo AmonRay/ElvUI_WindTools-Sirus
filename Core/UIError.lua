@@ -8,8 +8,7 @@ local tinsert = tinsert
 local type = type
 local xpcall = xpcall
 
-local FrameUtil_RegisterForTopLevelParentChanged = FrameUtil.RegisterForTopLevelParentChanged
-local GenerateFlatClosure = GenerateFlatClosure
+
 
 local DEFAULT_HANDLER_PRIORITY = 1000
 
@@ -52,8 +51,6 @@ function W:HookUIError()
 		return
 	end
 
-	FrameUtil_RegisterForTopLevelParentChanged(W.UIErrorsFrame)
-
 	W.UIErrorsFrame.flashingFontStrings = {}
 
 	if not self:IsHooked(_G.UIErrorsFrame, "AddMessage") then
@@ -65,7 +62,12 @@ function W:HookUIError()
 			---@type UIErrorHandlerParams
 			local params = { frame = frame, message = message, r = r, g = g, b = b, a = a }
 			for _, handlerData in ipairs(self.UIErrorHandlers) do
-				local success, result = xpcall(handlerData.handler, F.Developer.ThrowError, params)
+				-- Lua 5.1 xpcall does not forward extra arguments to the called
+				-- function (unlike WoW's retail patch). Wrap the invocation in a
+				-- closure so the handler receives the params table.
+				local success, result = xpcall(function()
+					return handlerData.handler(params)
+				end, F.Developer.ThrowError)
 				if not success then
 					return
 				end
@@ -82,11 +84,15 @@ function W:HookUIError()
 	end
 
 	if not self:IsHooked(_G.UIErrorsFrame, "Show") then
-		self:SecureHook(_G.UIErrorsFrame, "Show", GenerateFlatClosure(SyncVisibility, true))
+		self:SecureHook(_G.UIErrorsFrame, "Show", function()
+			SyncVisibility(true)
+		end)
 	end
 
 	if not self:IsHooked(_G.UIErrorsFrame, "Hide") then
-		self:SecureHook(_G.UIErrorsFrame, "Hide", GenerateFlatClosure(SyncVisibility, false))
+		self:SecureHook(_G.UIErrorsFrame, "Hide", function()
+			SyncVisibility(false)
+		end)
 	end
 
 	if not self:IsHooked(_G.UIErrorsFrame, "SetShown") then

@@ -159,8 +159,8 @@ function RM:ToggleSettings()
 			self.bar,
 			"visibility",
 			self.db.visibility == "DEFAULT" and "[noexists, nogroup] hide; show"
-				or self.db.visibility == "ALWAYS" and "[petbattle] hide; show"
-				or "[group] show; [petbattle] hide; hide"
+				or self.db.visibility == "ALWAYS" and "show"
+				or "[group] show; hide"
 		)
 	end
 
@@ -192,7 +192,7 @@ function RM:CreateBar()
 	frame:SetFrameStrata("DIALOG")
 	self.barAnchor = frame
 
-	frame = CreateFrame("Frame", nil, E.UIParent, "BackdropTemplate")
+	frame = CreateFrame("Frame", nil, E.UIParent)
 	frame:SetResizable(false)
 	frame:SetClampedToScreen(true)
 	frame:SetFrameStrata("LOW")
@@ -246,7 +246,7 @@ function RM:CreateButtons()
 	for i = 1, 11 do
 		local button = self.bar.buttons[i]
 		if not button then
-			button = CreateFrame("Button", nil, self.bar, "SecureActionButtonTemplate, BackdropTemplate") --[[@as Button]]
+			button = CreateFrame("Button", nil, self.bar, "SecureActionButtonTemplate") --[[@as Button]]
 			button:CreateBackdrop("Transparent")
 		end
 		button:Size(self.db.buttonSize)
@@ -270,7 +270,13 @@ function RM:CreateButtons()
 		elseif i == 9 then -- Clear All
 			tex:SetTexture("Interface\\BUTTONS\\UI-GroupLoot-Pass-Up")
 
-			button:ClearAttribute("marker")
+			-- ClearAttribute is a retail method; on 3.3.5a attributes are cleared
+			-- by setting the key to nil
+			if button.ClearAttribute then
+				button:ClearAttribute("marker")
+			else
+				button:SetAttribute("marker", nil)
+			end
 			local prefix = strlower(RM.modifierString)
 			if not self.db.inverse then
 				button:SetAttribute(prefix .. "-type*", "worldmarker")
@@ -351,7 +357,11 @@ function RM:CreateButtons()
 
 		local animGroup = tex:CreateAnimationGroup()
 		local scaleAnim = animGroup:CreateAnimation("Scale")
-		scaleAnim:SetTarget(tex)
+		-- SetTarget is a retail SimpleAnim-only method; on 3.3.5a the classic
+		-- Scale animation auto-targets its parent region (tex), so guard it.
+		if scaleAnim.SetTarget then
+			scaleAnim:SetTarget(tex)
+		end
 		scaleAnim:SetOrigin("CENTER", 0, 0)
 
 		button.animGroup = animGroup

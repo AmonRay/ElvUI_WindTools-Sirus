@@ -23,12 +23,43 @@ local UIErrorsFrame = _G.UIErrorsFrame
 local UnitLevel = UnitLevel
 
 local C_MythicPlus_IsMythicPlusActive = C_MythicPlus and C_MythicPlus.IsMythicPlusActive or function() return false end
-local C_QuestLog_GetInfo = C_QuestLog and C_QuestLog.GetInfo or function() return nil end
+local LegacyGetQuestLogTitle = GetQuestLogTitle
+local C_QuestLog_GetInfo = C_QuestLog and C_QuestLog.GetInfo or function(index)
+	if not LegacyGetQuestLogTitle then return nil end
+	local title, level, tag, suggestedGroup, isHeader, isCollapsed, isComplete, isDaily, questID = LegacyGetQuestLogTitle(index)
+	return title and { title = title, level = level, questTag = tag, suggestedGroup = suggestedGroup, isHeader = isHeader, isCollapsed = isCollapsed, isComplete = isComplete, isDaily = isDaily, questID = questID }
+end
 local C_QuestLog_GetNumQuestLogEntries = C_QuestLog and C_QuestLog.GetNumQuestLogEntries or GetNumQuestLogEntries or function() return 0 end
-local C_QuestLog_GetQuestObjectives = C_QuestLog and C_QuestLog.GetQuestObjectives or function() return {} end
-local C_QuestLog_GetQuestTagInfo = C_QuestLog and C_QuestLog.GetQuestTagInfo or function() return nil end
-local C_QuestLog_IsComplete = C_QuestLog and C_QuestLog.IsComplete or function() return false end
-local C_ScenarioInfo_GetCriteriaInfo = C_ScenarioInfo and C_ScenarioInfo.GetCriteriaInfo or function() return nil end
+local LegacyGetQuestLogTitle = GetQuestLogTitle
+local C_QuestLog_GetQuestObjectives = C_QuestLog and C_QuestLog.GetQuestObjectives or function(questID)
+	local index = 1
+	if GetQuestLogTitle then
+		while index <= C_QuestLog_GetNumQuestLogEntries() do
+			local _, _, _, _, isHeader, _, _, _, id = GetQuestLogTitle(index)
+			if not isHeader and id == questID then break end
+			index = index + 1
+		end
+	end
+	local objectives = {}
+	if GetQuestLogLeaderBoard and index <= C_QuestLog_GetNumQuestLogEntries() then
+		local count = GetNumQuestLeaderBoards and GetNumQuestLeaderBoards(index) or 0
+		for objectiveIndex = 1, count do
+			local text, objectiveType, finished = GetQuestLogLeaderBoard(objectiveIndex, index)
+			objectives[#objectives + 1] = { text = text, type = objectiveType, finished = finished }
+		end
+	end
+	return objectives
+end
+local C_QuestLog_GetQuestTagInfo = W.Compatibility.GetQuestTagInfo
+local C_QuestLog_IsComplete = C_QuestLog and C_QuestLog.IsComplete or function(questID)
+	if not GetQuestLogTitle then return false end
+	for index = 1, C_QuestLog_GetNumQuestLogEntries() do
+		local _, _, _, _, isHeader, _, complete, _, id = GetQuestLogTitle(index)
+		if not isHeader and id == questID then return complete == 1 or complete == true end
+	end
+	return false
+end
+local C_ScenarioInfo_GetCriteriaInfo = C_ScenarioInfo and C_ScenarioInfo.GetCriteriaInfo or GetAchievementCriteriaInfo
 local C_ScenarioInfo_GetScenarioStepInfo = C_ScenarioInfo and C_ScenarioInfo.GetScenarioStepInfo or function() return nil end
 
 local QuestFrequency = _G.Enum and _G.Enum.QuestFrequency or {}
@@ -126,6 +157,12 @@ local function FetchAllQuestProgressData()
 
 	for questIndex = 1, C_QuestLog_GetNumQuestLogEntries() do
 		local questInfo = C_QuestLog_GetInfo(questIndex)
+		if not questInfo and LegacyGetQuestLogTitle then
+			local title, level, tag, suggestedGroup, isHeader, isCollapsed, isComplete, isDaily, questID = LegacyGetQuestLogTitle(questIndex)
+			if title then
+				questInfo = { title = title, level = level, tag = tag, suggestedGroup = suggestedGroup, isHeader = isHeader, isCollapsed = isCollapsed, isComplete = isComplete, isDaily = isDaily, questID = questID }
+			end
+		end
 		if questInfo then
 			local tagInfo = C_QuestLog_GetQuestTagInfo(questInfo.questID)
 

@@ -9,6 +9,11 @@ function S:Blizzard_CharacterCustomize()
 		return
 	end
 	local frame = _G.CharCustomizeFrame
+	-- CharCustomizeFrame is the retail (Dragonflight+) character customization UI;
+	-- Wrath barber shop is BarberShopFrame, so CharCustomizeFrame is nil here.
+	if not frame or not frame.SmallButtons then
+		return
+	end
 
 	self:CreateBackdropShadow(frame.SmallButtons.ResetCameraButton)
 	self:CreateBackdropShadow(frame.SmallButtons.ZoomOutButton)
@@ -51,6 +56,9 @@ function S:Blizzard_BarbershopUI()
 	end
 
 	local frame = _G.BarberShopFrame
+	if not frame then
+		return
+	end
 
 	self:CreateBackdropShadow(frame.ResetButton)
 	self:CreateBackdropShadow(frame.CancelButton)

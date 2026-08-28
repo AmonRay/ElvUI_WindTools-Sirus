@@ -152,16 +152,18 @@ function S:Immersion()
 	talkBox.MainFrame.Indicator:ClearAllPoints()
 	talkBox.MainFrame.Indicator:Point("RIGHT", talkBox.MainFrame.CloseButton, "LEFT", -2, 0)
 
-	-- Reputation bar
+	-- Reputation bar (ReputationBar may be absent in older Immersion builds)
 	local repBar = talkBox.ReputationBar
-	repBar:StripTextures()
-	repBar:SetStatusBarTexture(E.media.normTex)
-	repBar:CreateBackdrop()
-	repBar:ClearAllPoints()
-	repBar:Point("TOPLEFT", talkBox, "TOPLEFT", 11, -11)
-	repBar:Height(6)
+	if repBar then
+		repBar:StripTextures()
+		repBar:SetStatusBarTexture(E.media.normTex)
+		repBar:CreateBackdrop()
+		repBar:ClearAllPoints()
+		repBar:Point("TOPLEFT", talkBox, "TOPLEFT", 11, -11)
+		repBar:Height(6)
 
-	E:RegisterStatusBar(repBar)
+		E:RegisterStatusBar(repBar)
+	end
 
 	-- Backdrop of elements (bottom window)
 	local elements = talkBox.Elements
@@ -186,7 +188,10 @@ function S:Immersion()
 	F.SetFont(content.RewardsFrame.ItemReceiveText)
 	F.SetFont(content.RewardsFrame.ItemChooseText)
 	F.SetFont(content.RewardsFrame.PlayerTitleText)
-	F.SetFont(content.RewardsFrame.SkillPointFrame.ValueText)
+	-- SkillPointFrame is absent in some Immersion builds
+	if content.RewardsFrame.SkillPointFrame and content.RewardsFrame.SkillPointFrame.ValueText then
+		F.SetFont(content.RewardsFrame.SkillPointFrame.ValueText)
+	end
 
 	-- Buttons
 	self:SecureHookScript(frame, "OnEvent", "Immersion_ReskinTitleButton")

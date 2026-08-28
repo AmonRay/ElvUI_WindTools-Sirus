@@ -391,7 +391,7 @@ function AT:ScrollElementInitializer(frame, data, scrollBox)
 		frame:SetTemplate()
 		frame:SetBackdropColor(C.ExtractRGBAFromTemplate("neutral-900"))
 
-		local TooltipFrame = CreateFrame("Frame", nil, self.MainFrame.ScrollFrame, "BackdropTemplate")
+		local TooltipFrame = CreateFrame("Frame", nil, self.MainFrame.ScrollFrame)
 		TooltipFrame:SetFrameStrata("TOOLTIP")
 		TooltipFrame:SetTemplate("Transparent")
 		TooltipFrame:SetBackdropColor(0, 0, 0, 0.95)
@@ -469,7 +469,7 @@ function AT:ScrollElementInitializer(frame, data, scrollBox)
 		Background:SetColorTexture(C.ExtractRGBFromTemplate("neutral-950"))
 		frame.ProgressBackdrop.Background = Background
 
-		local IconFrame = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+		local IconFrame = CreateFrame("Frame", nil, frame)
 		IconFrame:Size(ELEMENT_ICON_SIZE)
 		IconFrame:Point("TOPLEFT", frame, "TOPLEFT", 8, -8)
 		IconFrame:SetTemplate()
@@ -745,7 +745,7 @@ function AT:Construct()
 	end
 
 	---@class WTAchievementTracker : Frame, BackdropTemplate
-	local MainFrame = CreateFrame("Frame", "WTAchievementTracker", E.UIParent, "BackdropTemplate")
+	local MainFrame = CreateFrame("Frame", "WTAchievementTracker", E.UIParent)
 	MainFrame:Size(self.db.width, self.db.height)
 	MainFrame:SetTemplate("Transparent")
 	MainFrame:SetShown(self.db.enabled and self.db.show)
@@ -775,14 +775,14 @@ function AT:Construct()
 	S:Proxy("HandleEditBox", SearchBox)
 	MainFrame.SearchBox = SearchBox
 
-	local ControlFrame1 = CreateFrame("Frame", nil, MainFrame, "BackdropTemplate")
+	local ControlFrame1 = CreateFrame("Frame", nil, MainFrame)
 	ControlFrame1:Height(40)
 	ControlFrame1:Point("TOPLEFT", SearchBox, "BOTTOMLEFT", -4, -5)
 	ControlFrame1:Point("TOPRIGHT", SearchBox, "BOTTOMRIGHT", 4, -5)
 	ControlFrame1:SetTemplate("Transparent")
 	MainFrame.ControlFrame1 = ControlFrame1
 
-	local ThresholdSlider = CreateFrame("Slider", nil, ControlFrame1, "BackdropTemplate")
+	local ThresholdSlider = CreateFrame("Slider", nil, ControlFrame1)
 	ThresholdSlider:Size(140, 16)
 	ThresholdSlider:Point("LEFT", ControlFrame1, "LEFT", 11, -8)
 	ThresholdSlider:SetOrientation("HORIZONTAL")
@@ -856,7 +856,7 @@ function AT:Construct()
 	end)
 	ControlFrame1.RefreshButton = RefreshButton
 
-	local ControlFrame2 = CreateFrame("Frame", nil, MainFrame, "BackdropTemplate")
+	local ControlFrame2 = CreateFrame("Frame", nil, MainFrame)
 	ControlFrame2:Height(32)
 	ControlFrame2:Point("TOPLEFT", ControlFrame1, "BOTTOMLEFT", 0, -5)
 	ControlFrame2:Point("TOPRIGHT", ControlFrame1, "BOTTOMRIGHT", 0, -5)
@@ -1094,7 +1094,7 @@ function AT:Construct()
 	end)
 
 	MainFrame.ProgressFrame:Hide()
-	MainFrame.CriteriaLinePool = CreateFramePool("Frame", nil, "BackdropTemplate")
+	MainFrame.CriteriaLinePool = CreateFramePool("Frame", nil)
 end
 
 ---Handle ACHIEVEMENT_EARNED event
@@ -1162,8 +1162,21 @@ function AT:UpdatePosition()
 	return true
 end
 
+local function AT_RetailDropdownAvailable()
+	-- The retail DropdownButton frame type + menu API is absent on 3.3.5a; the whole
+	-- tracker control panel is built from retail widgets, so skip it gracefully.
+	local ok = pcall(function()
+		return CreateFrame("DropdownButton")
+	end)
+	return ok
+end
+
 function AT:Initialize()
 	if not E.db or not E.db.WT or not E.db.WT.quest.achievementTracker then
+		return
+	end
+
+	if not AT_RetailDropdownAvailable() then
 		return
 	end
 

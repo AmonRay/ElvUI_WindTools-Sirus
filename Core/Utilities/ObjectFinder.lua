@@ -88,7 +88,9 @@ local function startProcessing(self)
 
 								if request.callback then
 									RunNextFrame(function()
-										xpcall(request.callback, F.Developer.ThrowError, obj)
+										xpcall(function()
+											return request.callback(obj)
+										end, F.Developer.ThrowError)
 									end)
 								end
 							end

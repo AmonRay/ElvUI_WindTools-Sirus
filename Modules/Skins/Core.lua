@@ -55,7 +55,8 @@ S.texturePathFetcher = E.UIParent:CreateTexture(nil, "ARTWORK")
 S.texturePathFetcher:Hide()
 
 -- Override Settings.RegisterCanvasLayoutCategory to track setting frames
-local RegisterCanvasLayoutCategory = Settings.RegisterCanvasLayoutCategory
+local RegisterCanvasLayoutCategory = Settings and Settings.RegisterCanvasLayoutCategory
+if RegisterCanvasLayoutCategory then
 ---@diagnostic disable-next-line: duplicate-set-field
 Settings.RegisterCanvasLayoutCategory = function(frame, name)
 	if frame and name then
@@ -67,6 +68,7 @@ Settings.RegisterCanvasLayoutCategory = function(frame, name)
 	end
 
 	return RegisterCanvasLayoutCategory(frame, name)
+end
 end
 
 ---Check if the texture path is equal to the given path
@@ -139,14 +141,31 @@ function S:CreateShadow(frame, size, r, g, b, force)
 	size = size or 4
 	size = size + (E.private.WT.skins.increasedSize or 0)
 
-	local shadow = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-	E:ReplaceSetupTextureCoordinates(shadow)
-	shadow:SetFrameStrata(frame:GetFrameStrata())
+	local shadow = CreateFrame("Frame", nil, frame)
+	if not shadow then
+		return
+	end
+	if type(E.ReplaceSetupTextureCoordinates) == "function" then
+		E:ReplaceSetupTextureCoordinates(shadow)
+	end
+	-- Some frames (e.g. nameplate aura icons on the 3.3.5a fork) report their
+	-- strata as nil or "UNKNOWN"; SetFrameStrata rejects those, so normalize.
+	local strata = frame:GetFrameStrata()
+	if strata == nil or strata == "UNKNOWN" then
+		strata = "MEDIUM"
+	end
+	shadow:SetFrameStrata(strata)
 	shadow:SetFrameLevel(frame:GetFrameLevel() or 1)
 	shadow:SetOutside(frame, size, size)
-	shadow:SetBackdrop({ edgeFile = LSM:Fetch("border", "ElvUI GlowBorder"), edgeSize = size + 1 })
-	shadow:SetBackdropColor(r, g, b, 0)
-	shadow:SetBackdropBorderColor(r, g, b, 0.618)
+	if shadow.SetBackdrop then
+		shadow:SetBackdrop({ edgeFile = LSM:Fetch("border", "ElvUI GlowBorder"), edgeSize = size + 1 })
+	end
+	if shadow.SetBackdropColor then
+		shadow:SetBackdropColor(r, g, b, 0)
+	end
+	if shadow.SetBackdropBorderColor then
+		shadow:SetBackdropBorderColor(r, g, b, 0.618)
+	end
 	shadow.__wind = true -- mark the shadow created by WindTools
 
 	frame.shadow = shadow
@@ -195,8 +214,12 @@ function S:UpdateShadowColor(shadow, r, g, b)
 	g = g or E.private.WT.skins.color.g or 0
 	b = b or E.private.WT.skins.color.b or 0
 
-	shadow:SetBackdropColor(r, g, b, 0)
-	shadow:SetBackdropBorderColor(r, g, b, 0.618)
+	if shadow.SetBackdropColor then
+		shadow:SetBackdropColor(r, g, b, 0)
+	end
+	if shadow.SetBackdropBorderColor then
+		shadow:SetBackdropBorderColor(r, g, b, 0.618)
+	end
 end
 
 do
@@ -352,8 +375,15 @@ function S:HandleAceGUIWidget(lib, name, constructor)
 end
 
 function S:ProcessWaitingAceGUIWidgets()
-	local lib = _G.LibStub:GetLibrary("AceGUI-3.0", true)
-	assert(lib, "ProcessWaitingAceWidgets: AceGUI-3.0 not found")
+	-- AceGUI-3.0 is embedded in the LoadOnDemand ElvUI_Options addon, so on a
+	-- fresh login it is not registered with LibStub yet (retail ElvUI embeds it
+	-- in the core addon). A missing library must not abort the whole Skins
+	-- initialization — the AceGUI widget skinning is applied later by
+	-- HandleAceGUIWidget once the options UI loads the library.
+	local lib = _G.LibStub and _G.LibStub:GetLibrary("AceGUI-3.0", true)
+	if not lib then
+		return
+	end
 
 	for name, widgets in pairs(self.aceWidgetWaitingList) do
 		local config = self.aceWidgetConfigs[name]
@@ -457,7 +487,9 @@ function S:PLAYER_ENTERING_WORLD()
 	end
 
 	for index, func in next, self.enteredLoad do
-		xpcall(func, F.Developer.ThrowError, self)
+		xpcall(function()
+			return func(self)
+		end, F.Developer.ThrowError)
 		self.enteredLoad[index] = nil
 	end
 end
@@ -474,7 +506,11 @@ end
 ---@param callbacks table The callback functions table
 function S:CallLoadedAddon(addonName, callbacks)
 	for _, callback in next, callbacks do
-		if not xpcall(callback, F.Developer.ThrowError, self) then
+		if
+			not xpcall(function()
+				return callback(self)
+			end, F.Developer.ThrowError)
+		then
 			self:Log("debug", format("Failed to run addon %s", addonName))
 		end
 	end
@@ -520,7 +556,11 @@ function S:LibStub_NewLibrary(_, major, minor)
 			return
 		end
 		for _, func in next, self.libraryHandlers[major] do
-			if not xpcall(func, F.Developer.ThrowError, self, lib) then
+			if
+				not xpcall(function()
+					return func(self, lib)
+				end, F.Developer.ThrowError)
+			then
 				self:Log("debug", format("Failed to skin library %s", major, minor))
 			end
 		end
@@ -615,7 +655,11 @@ end
 ---@param ... any Additional arguments to pass
 function S:Proxy(method, frame, ...)
 	if not frame then
-		F.Developer.ThrowError("Failed to proxy function: frame is nil.", "\n funcName:", method)
+		-- On the 3.3.5a fork many third-party addons skin sub-frames that are not
+		-- constructed yet when OnLoad fires (e.g. Auctionator filterKeySelector's
+		-- DropDown). This is expected, not an error: skip silently instead of
+		-- spamming "Failed to proxy function: frame is nil".
+		self:Log("debug", "Proxy: skip nil frame for method " .. tostring(method))
 		return
 	end
 
@@ -651,9 +695,27 @@ function S:TryPostHook(frame, method, hookFunc)
 	if frame and method and _G[frame] and _G[frame][method] then
 		hooksecurefunc(_G[frame], method, function(f, ...)
 			---Hook function with skin tracking to prevent duplicate skinning
+			local args = { ... }
 			if not f.__windSkin then
-				hookFunc(f, ...)
-				f.__windSkin = true
+				local ok, err = pcall(hookFunc, f, unpack(args))
+				if ok then
+					f.__windSkin = true
+				else
+					-- On the 3.3.5a fork many addons construct their sub-frames during a
+					-- later stage of OnLoad, so the skin callback's sub-frames are not
+					-- ready yet (e.g. Auctionator shoppingItem's QualityContainer). Keep
+					-- the first attempt from crashing the UI, then retry shortly.
+					E:Delay(0.2, function()
+						if f and not f.__windSkin then
+							local ok2, err2 = pcall(hookFunc, f, unpack(args))
+							if ok2 then
+								f.__windSkin = true
+							else
+								self:Log("debug", "Skin fail " .. tostring(frame) .. "." .. tostring(method) .. ": " .. tostring(err2))
+							end
+						end
+					end)
+				end
 			end
 		end)
 	else
@@ -804,7 +866,11 @@ function S:Initialize()
 
 	-- Run Blizzard skins
 	for index, func in next, self.nonAddonsToLoad do
-		if not xpcall(func, F.Developer.ThrowError, self) then
+		if
+			not xpcall(function()
+				return func(self)
+			end, F.Developer.ThrowError)
+		then
 			self:Log("debug", "Failed to run skin function")
 		end
 		self.nonAddonsToLoad[index] = nil

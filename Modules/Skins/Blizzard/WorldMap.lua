@@ -14,6 +14,12 @@ function S:WorldMapFrame()
 
 	self:CreateBackdropShadow(_G.WorldMapFrame)
 
+	-- QuestMapFrame plus QuestSessionManager are retail-only and do not exist on
+	-- 3.3.5a (Wrath world map has no separate quest-map overlay), so skip the
+	-- whole quest-map skin gracefully.
+	if not _G.QuestMapFrame then
+		return
+	end
 	local QuestMapFrame = _G.QuestMapFrame
 
 	if QuestMapFrame.QuestsFrame and QuestMapFrame.QuestsFrame.ScrollFrame then
@@ -47,9 +53,11 @@ function S:WorldMapFrame()
 		end
 	end
 
-	hooksecurefunc(_G.QuestSessionManager, "NotifyDialogShow", function(_, dialog)
-		self:CreateBackdropShadow(dialog)
-	end)
+	if _G.QuestSessionManager then
+		hooksecurefunc(_G.QuestSessionManager, "NotifyDialogShow", function(_, dialog)
+			self:CreateBackdropShadow(dialog)
+		end)
+	end
 
 	local tabs = {
 		QuestMapFrame.QuestsTab,

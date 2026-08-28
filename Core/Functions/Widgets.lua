@@ -46,7 +46,7 @@ end
 ---@param onClick function? Click handler function (optional)
 ---@return any closeButton The created close button
 local function createCloseButton(parent, size, onClick)
-	local frame = CreateFrame("Button", nil, parent, "UIPanelCloseButton, BackdropTemplate") --[[@as Button]]
+	local frame = CreateFrame("Button", nil, parent, "UIPanelCloseButton") --[[@as Button]]
 
 	if size then
 		frame:Size(size)

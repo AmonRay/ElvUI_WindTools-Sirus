@@ -198,7 +198,10 @@ function RM:Initialize()
 		self:RegisterEvent("ADDON_LOADED")
 	end
 
-	_G.MinimapBackdrop.StaticOverlayTexture:SetAlpha(0)
+	-- StaticOverlayTexture is a retail-only region; absent on 3.3.5a
+	if _G.MinimapBackdrop and _G.MinimapBackdrop.StaticOverlayTexture then
+		_G.MinimapBackdrop.StaticOverlayTexture:SetAlpha(0)
+	end
 
 	F.TaskManager:AfterLogin(self.SetUpdateHook, self)
 end
