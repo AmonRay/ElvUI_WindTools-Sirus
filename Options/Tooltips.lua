@@ -726,12 +726,13 @@ options.groupInfo = {
 			values = function()
 				local result = {}
 				for _, style in pairs(F.GetClassIconStyleList()) do
-					local monkIcon = F.GetClassIconStringWithStyle("MONK", style)
+					-- Wrath classes only: MONK/EVOKER icons do not exist on 3.3.5a/Sirus.
+					local deathKnightIcon = F.GetClassIconStringWithStyle("DEATHKNIGHT", style)
 					local druidIcon = F.GetClassIconStringWithStyle("DRUID", style)
-					local evokerIcon = F.GetClassIconStringWithStyle("EVOKER", style)
+					local paladinIcon = F.GetClassIconStringWithStyle("PALADIN", style)
 
-					if monkIcon and druidIcon and evokerIcon then
-						result[style] = format("%s %s %s", monkIcon, druidIcon, evokerIcon)
+					if deathKnightIcon and druidIcon and paladinIcon then
+						result[style] = format("%s %s %s", deathKnightIcon, druidIcon, paladinIcon)
 					end
 				end
 				return result
