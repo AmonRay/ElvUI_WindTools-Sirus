@@ -7,6 +7,14 @@ local wipe = wipe
 local CreateAbbreviateConfig = CreateAbbreviateConfig
 
 function M:Math()
+	-- Retail ElvUI builds number abbreviations with E:BuildAbbreviateConfigs /
+	-- E.Abbreviate (CreateAbbreviateConfig). ElvUI-Sirus uses the older
+	-- E.ShortPrefixStyles table whose CHINESE style is already {Y, W}, so the
+	-- kanji-free output this option provides is the ElvUI-Sirus default.
+	if type(E.BuildAbbreviateConfigs) ~= "function" or type(E.Abbreviate) ~= "table" or not CreateAbbreviateConfig then
+		return
+	end
+
 	if E.private.WT.misc.noKanjiMath then
 		hooksecurefunc(E, "BuildAbbreviateConfigs", function()
 			if not (E.db.general.numberPrefixStyle == "CHINESE" or E.db.general.numberPrefixStyle == "TCHINESE") then
