@@ -1,7 +1,11 @@
 local W, F, E = unpack((select(2, ...))) ---@type WindTools, Functions, ElvUI
 
 local _G = _G
+local hooksecurefunc = hooksecurefunc
+local ipairs = ipairs
 local pairs = pairs
+local select = select
+local setmetatable = setmetatable
 local sort = sort
 local strsub = strsub
 local tinsert = tinsert
@@ -130,24 +134,38 @@ end
 Compatibility.IsQuestFlaggedCompleted = makeQuestCompletedChecker("IsQuestFlaggedCompleted")
 Compatibility.IsQuestFlaggedCompletedOnAccount = makeQuestCompletedChecker("IsQuestFlaggedCompletedOnAccount")
 
--- C_Timer is present on this client (UITimerDocumentation; ElvUI calls
--- C_Timer:NewTicker/NewTimer/After directly). The wrapper accepts both the
--- retail (seconds, callback) and 4.x-style (seconds, iterations, callback) forms.
-local function bindTimerMethod(method)
+-- C_Timer on Sirus is implemented in Lua (SharedXML/C_TimerAugment.lua) with
+-- MIXED calling conventions, unlike retail where everything is a dot call:
+--   function C_Timer:After(duration, callback)                 -- colon
+--   function C_Timer:NewTicker(duration, callback, iterations) -- colon
+--   function C_Timer.NewTimer(duration, callback)              -- dot
+-- Calling them with the wrong convention shifts the arguments and corrupts the
+-- timer queue (compare errors inside its OnUpdate). These wrappers expose the
+-- retail dot-call signatures and pick the right convention per method: if the
+-- first parameter of the Sirus function is the namespace, pass C_Timer as self.
+local function bindTimerMethod(method, isColonMethod)
 	local timer = _G.C_Timer
 	if not timer or type(timer[method]) ~= "function" then
 		return nil
 	end
 	local timerMethod = timer[method]
-	return function(first, second, ...)
-		if type(first) == "number" then
-			return timerMethod(timer, first, second, ...)
+	if isColonMethod then
+		return function(duration, callback, ...)
+			return timerMethod(timer, duration, callback, ...)
 		end
-		return timerMethod(timer, second, first, ...)
+	end
+	return function(duration, callback, ...)
+		return timerMethod(duration, callback, ...)
 	end
 end
-Compatibility.NewTicker = bindTimerMethod("NewTicker")
-Compatibility.NewTimer = bindTimerMethod("NewTimer")
+-- Retail (native C_Timer): all dot. Sirus: After/NewTicker colon, NewTimer dot.
+-- The Sirus Lua augment wraps the native C_Timer2 table, so its presence
+-- identifies the Sirus convention.
+local isSirusTimer = type(_G.C_Timer2) == "table"
+Compatibility.IsSirusTimer = isSirusTimer
+Compatibility.NewTicker = bindTimerMethod("NewTicker", isSirusTimer)
+Compatibility.After = bindTimerMethod("After", isSirusTimer)
+Compatibility.NewTimer = bindTimerMethod("NewTimer", false)
 
 -- Specializations. This client ships C_SpecializationInfo with an EMPTY function
 -- table (per APIDocumentation) and no GetSpecialization / GetInspectSpecialization
