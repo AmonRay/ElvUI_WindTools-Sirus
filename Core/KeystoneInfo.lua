@@ -222,5 +222,7 @@ KI:RegisterEvent("CHALLENGE_MODE_RESET", "RequestData")
 KI:RegisterEvent("CHALLENGE_MODE_COMPLETED", "RequestAndCheckPlayerKeystone")
 KI:RegisterEvent("ITEM_CHANGED", "DelayedCheckPlayerKeystone")
 KI:RegisterEvent("ITEM_PUSH", "DelayedCheckPlayerKeystone")
+-- Sirus: server-pushed keystone info (FrameXML/Utils/C_Mythic.lua, custom event)
+KI:RegisterEvent("MYTHIC_PLUS_OWNED_KEYSTONE_UPDATE", "DelayedCheckPlayerKeystone")
 
 F.TaskManager:AfterLogin(KI.RequestAndCheckPlayerKeystone, KI, true)
