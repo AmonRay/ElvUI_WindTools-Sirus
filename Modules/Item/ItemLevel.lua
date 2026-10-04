@@ -9,6 +9,7 @@ local tostring = tostring
 local type = type
 
 local EquipmentManager_GetLocationData = EquipmentManager_GetLocationData
+local EquipmentManager_UnpackLocation = EquipmentManager_UnpackLocation
 local Item = Item
 local ItemLocation = ItemLocation
 
@@ -95,11 +96,27 @@ function IL:FlyoutButton()
 			and type(button.location) == "number"
 			and not (button.location >= EQUIPMENTFLYOUT_FIRST_SPECIAL_LOCATION)
 		then
-			-- EquipmentManager_GetLocationData is a Legion+ helper that this client
-			-- does not ship. Below EQUIPMENTFLYOUT_FIRST_SPECIAL_LOCATION the flyout
-			-- button location is already a plain inventory slot id, which is what
-			-- ItemLocation:CreateFromEquipmentSlot expects.
-			itemLocation = ItemLocation:CreateFromEquipmentSlot(button.location)
+			-- EquipmentManager_GetLocationData is a Legion+ helper. On 3.3.5a/Sirus the
+			-- flyout location is the packed ITEM_INVENTORY_LOCATION_* bitfield
+			-- (FrameXML/EquipmentFlyout.lua, EquipmentManager.lua), decoded by
+			-- EquipmentManager_UnpackLocation -> player, bank, bags, slot, bag.
+			if EquipmentManager_GetLocationData then
+				local locationData = EquipmentManager_GetLocationData(button.location)
+				if locationData.isBags then
+					itemLocation = ItemLocation:CreateFromBagAndSlot(locationData.bag, locationData.slot)
+				else
+					itemLocation = ItemLocation:CreateFromEquipmentSlot(locationData.slot)
+				end
+			elseif EquipmentManager_UnpackLocation then
+				local player, bank, bags, slot, bag = EquipmentManager_UnpackLocation(button.location)
+				if bags and bag and slot then
+					itemLocation = ItemLocation:CreateFromBagAndSlot(bag, slot)
+				elseif player and slot then
+					itemLocation = ItemLocation:CreateFromEquipmentSlot(slot)
+				elseif bank and slot and BANK_CONTAINER and BANK_CONTAINER_INVENTORY_OFFSET then
+					itemLocation = ItemLocation:CreateFromBagAndSlot(BANK_CONTAINER, slot - BANK_CONTAINER_INVENTORY_OFFSET)
+				end
+			end
 		end
 
 		if itemLocation then
