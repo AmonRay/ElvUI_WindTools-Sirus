@@ -180,6 +180,65 @@ function W:HasCapabilities(requirements)
 	return true
 end
 
+-- Option groups of features gated by W.ModuleRequirements. When the client
+-- lacks a requirement the module is never initialized, so its option setters
+-- (which call module methods) must not run: the group is disabled and explains
+-- why instead.
+W.FeatureOptionPaths = {
+	AchievementTracker = { "quest", "achievementTracker" },
+	CooldownViewerSkin = { "skins", "cooldownViewer" },
+	LFGList = { "misc", "lfgList" },
+	ObjectiveProgress = { "tooltips", "objectiveProgress" },
+	PreyHunt = { "quest", "preyHunt" },
+	Progression = { "tooltips", "progression" },
+	SpellActivationAlert = { "misc", "spellActivationAlert" },
+	SuperTracker = { "maps", "superTracker" },
+}
+
+local unavailableText = GetLocale() == "ruRU"
+		and "Недоступно на этом клиенте (WoW 3.3.5a / Sirus): нет API: %s."
+	or "Not available on this client (WoW 3.3.5a / Sirus): missing API: %s."
+
+---@param name string feature (module) name from W.ModuleRequirements
+---@return string[]? missing capability names, nil when the feature is available
+function W:GetMissingCapabilities(name)
+	local requirements = self.ModuleRequirements and self.ModuleRequirements[name]
+	if not requirements then
+		return nil
+	end
+	local missing
+	for _, capability in ipairs(requirements) do
+		if not self.Compatibility[capability] then
+			missing = missing or {}
+			missing[#missing + 1] = capability
+		end
+	end
+	return missing
+end
+
+---Disable the option groups of unavailable features (called from W:OptionsCallback).
+---@param root table E.Options.args.WindTools
+function W:ApplyUnavailableFeatureOptions(root)
+	for name, path in pairs(self.FeatureOptionPaths) do
+		local missing = self:GetMissingCapabilities(name)
+		local group = root
+		for _, key in ipairs(path) do
+			group = group and group.args and group.args[key]
+		end
+		if missing and type(group) == "table" then
+			group.disabled = true
+			group.args = group.args or {}
+			group.args.windUnavailableNotice = {
+				order = 0,
+				type = "description",
+				fontSize = "medium",
+				name = format(unavailableText, table.concat(missing, ", ")),
+				width = "full",
+			}
+		end
+	end
+end
+
 -- WindTools module initialization
 function W:InitializeModules()
 	for _, moduleName in pairs(W.RegisteredModules) do
