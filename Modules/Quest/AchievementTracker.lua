@@ -39,7 +39,8 @@ local GetCategoryNumAchievements = GetCategoryNumAchievements
 local GetKeysArray = GetKeysArray
 local GetNumTrackedAchievements = GetNumTrackedAchievements
 local GetTrackedAchievements = GetTrackedAchievements
-local MAX_TRACKED_ACHIEVEMENTS = MAX_TRACKED_ACHIEVEMENTS
+-- 3.3.5a WatchFrame caps tracked achievements at WATCHFRAME_MAXACHIEVEMENTS (10).
+local MAX_TRACKED_ACHIEVEMENTS = MAX_TRACKED_ACHIEVEMENTS or WATCHFRAME_MAXACHIEVEMENTS or 10
 local PlaySound = PlaySound
 local RemoveTrackedAchievement = RemoveTrackedAchievement
 local ToggleDropDownMenu = _G.ToggleDropDownMenu
