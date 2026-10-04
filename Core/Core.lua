@@ -185,9 +185,9 @@ end
 -- (which call module methods) must not run: the group is disabled and explains
 -- why instead.
 W.FeatureOptionPaths = {
-	AchievementTracker = { "quest", "achievementTracker" },
 	CooldownViewerSkin = { "skins", "cooldownViewer" },
 	LFGList = { "misc", "lfgList" },
+	MuteSounds = { "misc", "mute" },
 	ObjectiveProgress = { "tooltips", "objectiveProgress" },
 	PreyHunt = { "quest", "preyHunt" },
 	Progression = { "tooltips", "progression" },

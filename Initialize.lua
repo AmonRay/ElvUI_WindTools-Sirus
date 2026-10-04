@@ -101,8 +101,6 @@ W.ModuleRequirements = {
 	-- Sirus only exposes the player's own score.
 	MythicPlus = { "HasChallengeModeAPI", "HasMythicPlusAPI", "HasMythicPlusRatingAPI" },
 	ObjectiveProgress = { "HasModernQuestAPI" },
-	-- Sirus ships ScrollBox, but tracking uses retail C_ContentTracking/Constants.
-	AchievementTracker = { "HasScrollBoxAPI", "HasContentTrackingAPI" },
 	-- Retail premade-group (LFGList) + M+ affix requests; Sirus' LFG/M+ are custom.
 	LFGList = { "HasPremadeMythicPlusAPI" },
 	-- Not a module: Skins/Blizzard/CooldownViewer.lua (retail 11.1 cooldown manager).
@@ -114,6 +112,8 @@ W.ModuleRequirements = {
 	SpellActivationAlert = { "HasSpellActivationOverlay" },
 	-- Retail raid/M+ statistic IDs and MuteSoundFile (absent on 3.3.5a/Sirus).
 	Progression = { "HasSoundFileMuteAPI" },
+	-- Not a module: Misc/Mute.lua callback; per-file muting does not exist on 3.3.5a.
+	MuteSounds = { "HasSoundFileMuteAPI" },
 }
 
 -- Core/Load_Core.xml is evaluated after this file on the legacy client. The
