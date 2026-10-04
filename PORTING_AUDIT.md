@@ -484,11 +484,28 @@
 | Profiles (импорт) | исправлен | парсинг без retail-хелперов |
 | LFGList | отключён | нет premade M+ API |
 | MythicPlus (тултип) | отключён | нет rating summary |
-| Progression, ObjectiveProgress, AchievementTracker, PreyHunt, SuperTracker, SpellActivationAlert, CooldownViewer skin | отключены | нет требуемого API; опции показывают причину |
-| ContextMenu | инертен | UnitPopup на legacy-меню |
+| Progression, ObjectiveProgress, PreyHunt, SuperTracker, SpellActivationAlert, CooldownViewer skin, Misc > Mute | отключены | нет требуемого API; опции показывают причину |
+| AchievementTracker | портирован (a3c1d275) | Wrath-трекинг `AddTrackedAchievement`, ScrollFrame, UIDropDownMenu; лимит `WATCHFRAME_MAXACHIEVEMENTS` |
+| ContextMenu | портирован (a3c1d275) | legacy `UnitPopupMenus`/`UnitPopup_HideButtons`; риск taint для защищённых пунктов (Set Focus) — проверить в клиенте |
 | Contacts | работает | |
 | Skins | требует проверки в клиенте | харнесс не моделирует реальные фреймы |
 
 ## Ограничения
 - Проверка выполнена на mock-харнессе и по исходникам; обязательна проверка в клиенте: вход, `/reload`, опции, бой, смена зоны.
 - Обёртки событий ставятся на AceEvent текущей версии; апгрейд AceEvent другой копией после загрузки может их снять.
+
+## Ревью коммита a3c1d275 («fixes»)
+
+| Находка | Серьёзность | Решение |
+|---|---|---|
+| В коммит не попали `Core/DBSanitizer.lua`, `Modules/Compat/Load_Compat.xml`, `Modules/Compat/SirusCompat.lua`, `Options/SirusCompat.lua`, но XML на них ссылаются | высокая | нужно запушить файлы (их содержимого нет в репозитории) |
+| Preflight-заглушки (`MuteSoundFile`, `UnitGetTotalAbsorbs`, …) делали capability-пробы ложноположительными | высокая | `WindToolsPreflight.Shimmed` + `Compatibility.IsNativeFunction` |
+| `LibKeystone`: `C_Timer.NewTimer(C_Timer, …)` — на Sirus `NewTimer` вызывается через точку | высокая | dot-вызов + frame-фолбэк |
+| `LibKeystone`: `pcall(GetOwnerKeystoneInfo)` — лишний pcall | низкая | убран (чистый Lua, не бросает) |
+| `ItemLevel`: flyout `button.location` трактовался как слот, на Sirus это упакованное поле | средняя | `EquipmentManager_UnpackLocation` |
+| `ChatLink`: формат талант-ссылки 3.3.5a — `talentID:rank` (rank −1) | средняя | карта talentID→tab/index через `GetTalentLink` |
+| `AchievementTracker`: `MAX_TRACKED_ACHIEVEMENTS` нет в 3.3.5a | средняя | фолбэк `WATCHFRAME_MAXACHIEVEMENTS or 10` |
+| `SetGradient`-адаптер терял альфу | низкая | приоритет `SetGradientAlpha` |
+| Глобальные шимы видны другим аддонам (feature-detect по `UnitGetTotalAbsorbs` и т.п.) | риск | оставлено как есть; при конфликтах перенести стабы в `W.Compat` |
+| `ContextMenu`: вставка в `UnitPopupMenus` может вызвать taint/ADDON_ACTION_BLOCKED | риск | проверить Set Focus/Raid-пункты в клиенте |
+| `RaidMarkers`: обратная анимация `SetScale(1,1)` не анимирует уменьшение | косметика | не менялось |
