@@ -281,27 +281,51 @@ Compatibility.IsCosmeticItem = function(itemID)
 end
 
 -- Capability probes (resolved at load; used to gate retail-only modules).
-local function isNativeNamespace(name)
-	local api = _G[name]
-	return type(api) == "table"
+-- Sirus defines many retail-named namespaces in Lua with only a subset of the
+-- retail methods (e.g. C_Container only has sort/flag helpers, C_Map only
+-- GetAreaNameByID/GetParentMapID, C_Spell only IsSpellCrowdControl/
+-- IsSpellImportant, C_MountJournal/C_ToyBox are Sirus collection backends).
+-- A namespace table therefore proves nothing; probe the method a module needs.
+local function hasMethod(namespace, method)
+	local api = _G[namespace]
+	return type(api) == "table" and type(api[method]) == "function"
 end
+local function isNativeNamespace(name)
+	return type(_G[name]) == "table"
+end
+Compatibility.HasMethod = hasMethod
 
 Compatibility.HasTimerAPI = type(_G.C_Timer) == "table" and type(_G.C_Timer.NewTicker) == "function" and type(_G.C_Timer.NewTimer) == "function"
-Compatibility.HasModernContainers = isNativeNamespace("C_Container")
-Compatibility.HasModernItemAPI = isNativeNamespace("C_Item") and type(_G.C_Item.GetItemInfo) == "function"
-Compatibility.HasModernSpellAPI = isNativeNamespace("C_Spell")
+Compatibility.HasModernContainers = hasMethod("C_Container", "GetContainerNumSlots") and hasMethod("C_Container", "GetContainerItemInfo")
+Compatibility.HasModernItemAPI = hasMethod("C_Item", "GetItemInfo")
+Compatibility.HasModernSpellAPI = hasMethod("C_Spell", "GetSpellInfo")
 Compatibility.HasLegacyQuestAPI = type(_G.GetNumQuestLogEntries) == "function"
 Compatibility.HasLegacyTooltipAPI = type(_G.GameTooltip) == "table"
-Compatibility.HasModernMapAPI = isNativeNamespace("C_Map") and type(_G.C_Map.GetBestMapForUnit) == "function"
-Compatibility.HasModernQuestAPI = isNativeNamespace("C_QuestLog") and type(_G.C_QuestLog.GetQuestInfo) == "function"
-Compatibility.HasTooltipDataProcessor = type(_G.TooltipDataProcessor) == "table" and type(_G.TooltipDataProcessor.AddTooltipPostCall) == "function"
-Compatibility.HasChallengeModeAPI = isNativeNamespace("C_ChallengeMode")
-Compatibility.HasMythicPlusAPI = isNativeNamespace("C_MythicPlus")
+Compatibility.HasModernMapAPI = hasMethod("C_Map", "GetBestMapForUnit")
+Compatibility.HasModernQuestAPI = hasMethod("C_QuestLog", "GetQuestInfo")
+Compatibility.HasTooltipDataProcessor = hasMethod("TooltipDataProcessor", "AddTooltipPostCall")
+-- Sirus ships a Lua Mythic+ system (FrameXML/Utils/C_Mythic.lua) with the
+-- retail names for keystones, map info and dungeon score.
+Compatibility.HasChallengeModeAPI = hasMethod("C_ChallengeMode", "GetMapUIInfo")
+Compatibility.HasMythicPlusAPI = hasMethod("C_MythicPlus", "GetOwnedKeystoneLevel")
+-- Retail-only per-player rating summary (used by the M+ tooltip module).
+Compatibility.HasMythicPlusRatingAPI = hasMethod("C_PlayerInfo", "GetPlayerMythicPlusRatingSummary")
 Compatibility.HasBattleNetAPI = isNativeNamespace("C_BattleNet")
 Compatibility.HasClubAPI = isNativeNamespace("C_Club")
 Compatibility.HasModernSocialAPI = Compatibility.HasBattleNetAPI or Compatibility.HasClubAPI
 Compatibility.HasModernUnitAPI = type(_G.UnitHealthPercent) == "function" and type(_G.UnitGetTotalAbsorbs) == "function"
-Compatibility.HasModernCollectionsAPI = isNativeNamespace("C_MountJournal") or isNativeNamespace("C_ToyBox")
+Compatibility.HasModernCollectionsAPI = hasMethod("C_MountJournal", "GetMountIDs") and hasMethod("C_ToyBox", "GetToyInfo")
+-- Retail achievement/content tracking (10.1+); Sirus uses the legacy
+-- AddTrackedAchievement API and has no Constants.ContentTrackingConsts.
+Compatibility.HasContentTrackingAPI = hasMethod("C_ContentTracking", "GetTrackedIDs")
+	and type(_G.Constants) == "table" and type(_G.Constants.ContentTrackingConsts) == "table"
+-- Retail premade groups with M+ affix requests (LFGList module). Sirus has its
+-- own C_MythicPlus without RequestCurrentAffixes.
+Compatibility.HasPremadeMythicPlusAPI = hasMethod("C_MythicPlus", "RequestCurrentAffixes") and hasMethod("C_LFGList", "GetSearchResultInfo")
+-- Retail cooldown manager (Blizzard_CooldownViewer, 11.1+).
+Compatibility.HasCooldownViewerAPI = type(_G.C_CooldownViewer) == "table"
+-- MuteSoundFile/UnmuteSoundFile (8.2+) do not exist on 3.3.5a/Sirus.
+Compatibility.HasSoundFileMuteAPI = type(_G.MuteSoundFile) == "function" and type(_G.UnmuteSoundFile) == "function"
 Compatibility.HasModernSettingsAPI = type(_G.Settings) == "table"
 -- Retail scroll box helpers (CreateDataProvider / CreateScrollBoxListLinearView)
 -- are absent on this client. WindTools builds its lists on the native ScrollFrame
