@@ -1017,12 +1017,14 @@ do
 						values = function()
 							local v = {}
 							for _, style in pairs(F.GetClassIconStyleList()) do
-								local monkSample = F.GetClassIconStringWithStyle("MONK", style, 16, 16)
+								-- Wrath classes only: MONK/EVOKER icons do not exist on 3.3.5a/Sirus.
+								local deathKnightSample = F.GetClassIconStringWithStyle("DEATHKNIGHT", style, 16, 16)
 								local druidSample = F.GetClassIconStringWithStyle("DRUID", style, 16, 16)
 								local paladinSample = F.GetClassIconStringWithStyle("PALADIN", style, 16, 16)
 
-								local sample = monkSample .. " " .. druidSample .. " " .. paladinSample
-								v[style] = sample
+								if deathKnightSample and druidSample and paladinSample then
+									v[style] = deathKnightSample .. " " .. druidSample .. " " .. paladinSample
+								end
 							end
 							return v
 						end,
