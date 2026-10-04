@@ -313,7 +313,14 @@ Compatibility.HasMythicPlusRatingAPI = hasMethod("C_PlayerInfo", "GetPlayerMythi
 Compatibility.HasBattleNetAPI = isNativeNamespace("C_BattleNet")
 Compatibility.HasClubAPI = isNativeNamespace("C_Club")
 Compatibility.HasModernSocialAPI = Compatibility.HasBattleNetAPI or Compatibility.HasClubAPI
-Compatibility.HasModernUnitAPI = type(_G.UnitHealthPercent) == "function" and type(_G.UnitGetTotalAbsorbs) == "function"
+-- Preflight.lua installs stand-ins for missing globals; probes must see the client.
+local preflightShimmed = type(_G.WindToolsPreflight) == "table" and _G.WindToolsPreflight.Shimmed or {}
+local function isNativeFunction(name)
+	return type(_G[name]) == "function" and not preflightShimmed[name]
+end
+Compatibility.IsNativeFunction = isNativeFunction
+
+Compatibility.HasModernUnitAPI = isNativeFunction("UnitHealthPercent") and isNativeFunction("UnitGetTotalAbsorbs")
 Compatibility.HasModernCollectionsAPI = hasMethod("C_MountJournal", "GetMountIDs") and hasMethod("C_ToyBox", "GetToyInfo")
 -- Retail achievement/content tracking (10.1+); Sirus uses the legacy
 -- AddTrackedAchievement API and has no Constants.ContentTrackingConsts.
@@ -325,7 +332,7 @@ Compatibility.HasPremadeMythicPlusAPI = hasMethod("C_MythicPlus", "RequestCurren
 -- Retail cooldown manager (Blizzard_CooldownViewer, 11.1+).
 Compatibility.HasCooldownViewerAPI = type(_G.C_CooldownViewer) == "table"
 -- MuteSoundFile/UnmuteSoundFile (8.2+) do not exist on 3.3.5a/Sirus.
-Compatibility.HasSoundFileMuteAPI = type(_G.MuteSoundFile) == "function" and type(_G.UnmuteSoundFile) == "function"
+Compatibility.HasSoundFileMuteAPI = isNativeFunction("MuteSoundFile") and isNativeFunction("UnmuteSoundFile")
 Compatibility.HasModernSettingsAPI = type(_G.Settings) == "table"
 -- Retail scroll box helpers (CreateDataProvider / CreateScrollBoxListLinearView)
 -- are absent on this client. WindTools builds its lists on the native ScrollFrame

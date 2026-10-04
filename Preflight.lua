@@ -22,9 +22,15 @@ end
 ---Installs a global function only when the client does not provide it.
 ---@param name string global identifier
 ---@param fn function implementation
+-- Names installed here, so capability probes (Core/CompatibilityLayer.lua) can
+-- tell a native API from a WindTools stand-in: several shims below are inert
+-- stubs (MuteSoundFile, UnitGetTotalAbsorbs, ...) and must not make a feature
+-- look available.
+local shimmed = {}
 local function shim(name, fn)
 	if type(_G[name]) ~= "function" then
 		_G[name] = fn
+		shimmed[name] = true
 	end
 end
 
@@ -766,4 +772,5 @@ _G.WindToolsPreflight = {
 	HasModernCinematicAPI = type(_G.EventRegistry) == "table" and type(_G.MovieFrame_PlayMovie) == "function" and type(_G.Enum) == "table" and type(_G.Enum.CinematicType) == "table",
 	HasSpellActivationOverlay = type(_G.SpellActivationOverlayFrame) == "table" and type(_G.SpellActivationOverlayFrame.ShowOverlay) == "function",
 	OpenRaid = _G.WindTools_OpenRaidEnabled,
+	Shimmed = shimmed,
 }
