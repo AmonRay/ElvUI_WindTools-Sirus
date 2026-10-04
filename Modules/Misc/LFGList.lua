@@ -79,14 +79,20 @@ local FILTER_HIGH_DUNGEON_THRESHOLD = 12
 local PANEL_PADDING = 10
 local QUICK_ACCESS_PANEL_WIDTH = 2 * FILTER_BUTTON_WIDTH + FILTER_BUTTON_SPACING + PANEL_PADDING * 2 + 10
 
-local seasonGroups = C_LFGList_GetAvailableActivityGroups(
-	GROUP_FINDER_CATEGORY_ID_DUNGEONS,
-	bit.bor(LFG_FILTER_CURRENT_SEASON, LFG_FILTER_PVE)
-)
-local expansionGroups = C_LFGList_GetAvailableActivityGroups(
-	GROUP_FINDER_CATEGORY_ID_DUNGEONS,
-	bit.bor(LFG_FILTER_CURRENT_EXPANSION, LFG_FILTER_NOT_CURRENT_SEASON, LFG_FILTER_PVE)
-)
+-- Resolved on demand instead of at file load: the Sirus C_LFGList
+-- (FrameXML/Utils/C_LFGList.lua) builds groups from ClientData and the realm
+-- info (C_Service/C_RealmInfo), which are not reliable before login.
+local function GetDefaultActivityGroups()
+	local seasonGroups = C_LFGList_GetAvailableActivityGroups(
+		GROUP_FINDER_CATEGORY_ID_DUNGEONS,
+		bit.bor(LFG_FILTER_CURRENT_SEASON, LFG_FILTER_PVE)
+	) or {}
+	local expansionGroups = C_LFGList_GetAvailableActivityGroups(
+		GROUP_FINDER_CATEGORY_ID_DUNGEONS,
+		bit.bor(LFG_FILTER_CURRENT_EXPANSION, LFG_FILTER_NOT_CURRENT_SEASON, LFG_FILTER_PVE)
+	) or {}
+	return seasonGroups, expansionGroups
+end
 
 local vaultItemLevel = {}
 
@@ -1567,6 +1573,7 @@ function LL:UpdateAdvancedFilters()
 	end
 
 	if numActiveMaps == 0 then
+		local seasonGroups, expansionGroups = GetDefaultActivityGroups()
 		tAppendAll(activities, seasonGroups)
 		tAppendAll(activities, expansionGroups)
 	end
