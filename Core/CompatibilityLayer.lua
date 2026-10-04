@@ -399,5 +399,139 @@ function Compatibility:GetCapabilityReport()
 
 	return report
 end
+-- ---------------------------------------------------------------------------
+-- Event compatibility for AceEvent-embedded WindTools objects (W + modules).
+--
+-- 1. Aliases: retail events that have a direct 3.3.5a equivalent with the same
+--    meaning and no payload. GROUP_ROSTER_UPDATE (5.0+) was split into
+--    PARTY_MEMBERS_CHANGED + RAID_ROSTER_UPDATE on Wrath (ElvUI-Sirus itself
+--    registers those two). Handlers still receive the retail event name.
+-- 2. Sirus custom events: Sirus fires its Lua-implemented events (Mythic+,
+--    GET_ITEM_INFO_RECEIVED from its C_Item cache, ...) through
+--    FireCustomClientEvent, which only reaches frames registered with
+--    frame:RegisterCustomEvent (SharedXML/Utils/CustomEvents.lua). AceEvent only
+--    calls RegisterEvent, so such events never arrive. If the client did not
+--    accept the event natively, also register it as a custom event on the
+--    AceEvent frame - the same approach ElvUI-Sirus uses in
+--    E:RegisterEventForObject (Core/General/Core.lua).
+-- ---------------------------------------------------------------------------
+local EventAliases = {
+	GROUP_ROSTER_UPDATE = { "PARTY_MEMBERS_CHANGED", "RAID_ROSTER_UPDATE" },
+}
+Compatibility.EventAliases = EventAliases
+
+local AceEvent = _G.LibStub and _G.LibStub("AceEvent-3.0", true)
+local aceEventFrame = AceEvent and AceEvent.frame
+
+local function EnsureClientDelivery(event)
+	if not aceEventFrame or aceEventFrame:IsEventRegistered(event) then
+		return
+	end
+	if aceEventFrame.RegisterCustomEvent then
+		aceEventFrame:RegisterCustomEvent(event)
+	end
+end
+Compatibility.EnsureClientDelivery = EnsureClientDelivery
+
+-- proxies[target][aliasEvent] = proxy object used as the AceEvent "self" for
+-- the real events, so the target can still register those real events itself.
+local proxies = setmetatable({}, { __mode = "k" })
+
+local function GetProxy(target, event)
+	local byEvent = proxies[target]
+	if not byEvent then
+		byEvent = {}
+		proxies[target] = byEvent
+	end
+	local proxy = byEvent[event]
+	if not proxy then
+		proxy = {}
+		byEvent[event] = proxy
+	end
+	return proxy
+end
+
+local function PatchEventTarget(target)
+	if type(target) ~= "table" or target.__windEventCompat or type(target.RegisterEvent) ~= "function" or not AceEvent then
+		return
+	end
+	target.__windEventCompat = true
+
+	local originalRegister = target.RegisterEvent
+	local originalUnregister = target.UnregisterEvent
+	local originalUnregisterAll = target.UnregisterAllEvents
+
+	target.RegisterEvent = function(self, event, callback, ...)
+		local realEvents = EventAliases[event]
+		if not realEvents then
+			originalRegister(self, event, callback, ...)
+			EnsureClientDelivery(event)
+			return
+		end
+
+		local hasArg = select("#", ...) > 0
+		local arg = ...
+		local relay
+		if type(callback) == "function" then
+			relay = function(_, ...)
+				if hasArg then
+					callback(arg, event, ...)
+				else
+					callback(event, ...)
+				end
+			end
+		else
+			local method = callback or event
+			relay = function(_, ...)
+				local handler = self[method]
+				if type(handler) == "function" then
+					handler(self, event, ...)
+				end
+			end
+		end
+
+		local proxy = GetProxy(self, event)
+		for _, realEvent in ipairs(realEvents) do
+			AceEvent.RegisterEvent(proxy, realEvent, relay)
+		end
+	end
+
+	target.UnregisterEvent = function(self, event, ...)
+		local realEvents = EventAliases[event]
+		if not realEvents then
+			return originalUnregister(self, event, ...)
+		end
+		local byEvent = proxies[self]
+		local proxy = byEvent and byEvent[event]
+		if proxy then
+			for _, realEvent in ipairs(realEvents) do
+				AceEvent.UnregisterEvent(proxy, realEvent)
+			end
+		end
+	end
+
+	if originalUnregisterAll then
+		target.UnregisterAllEvents = function(self, ...)
+			local byEvent = proxies[self]
+			if byEvent then
+				for _, proxy in pairs(byEvent) do
+					AceEvent.UnregisterAllEvents(proxy)
+				end
+			end
+			return originalUnregisterAll(self, ...)
+		end
+	end
+end
+Compatibility.PatchEventTarget = PatchEventTarget
+
+-- W and the modules pre-registered in Initialize.lua already exist; modules
+-- created later (every Modules/* file) are patched right after NewModule.
+PatchEventTarget(W)
+for _, module in W:IterateModules() do
+	PatchEventTarget(module)
+end
+hooksecurefunc(W, "NewModule", function(self, name)
+	PatchEventTarget(self:GetModule(name, true))
+end)
 
 W.Compatibility = Compatibility
