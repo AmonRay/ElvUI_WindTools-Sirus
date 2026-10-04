@@ -25,6 +25,13 @@ function M:ReshiiWrapsUpgrade()
 		return
 	end
 
+	-- The trait UI (GenericTraitUI_LoadUI / GenericTraitFrame) and the Reshii
+	-- wraps item are retail-only; without them the middle-click shortcut cannot
+	-- work, so do not install the hook at all on 3.3.5a.
+	if type(GenericTraitUI_LoadUI) ~= "function" or not _G.CharacterBackSlot then
+		return
+	end
+
 	_G.CharacterBackSlot:HookScript("OnMouseDown", function(_, button)
 		if button == "MiddleButton" then
 			local itemID = GetInventoryItemID("player", INVSLOT_BACK)

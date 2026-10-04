@@ -354,6 +354,17 @@ function CB:DisableButton(name)
 	end
 end
 
+-- Informational "channel not configured" prints are throttled to once per
+-- session: UpdateBar runs on every profile/roster refresh and would otherwise
+-- repeat them indefinitely.
+local warnedOnce = {}
+local function WarnOnce(key, message)
+	if not warnedOnce[key] then
+		warnedOnce[key] = true
+		F.Print(message)
+	end
+end
+
 ---Get the world channel ID based on user configuration
 ---@return number channelID The world channel ID, or 0 if not found
 function CB:GetWorldChannelID()
@@ -424,7 +435,7 @@ function CB:UpdateBar()
 		local config = GetBestWorldChannelConfig(db.config)
 
 		if not config or not config.name or config.name == "" then
-			F.Print(L["World channel no found, please setup again."])
+			WarnOnce("world", L["World channel no found, please setup again."])
 			self:DisableButton("WORLD")
 		else
 			local chatFunc = function(_, mouseButton)
@@ -474,7 +485,7 @@ function CB:UpdateBar()
 		local db = self.db.channels.community
 		local name = db.name
 		if not name or name == "" then
-			F.Print(L["Club channel no found, please setup again."])
+			WarnOnce("club", L["Club channel no found, please setup again."])
 			self:DisableButton("CLUB")
 		else
 			local chatFunc = function(_, mouseButton)
@@ -483,7 +494,7 @@ function CB:UpdateBar()
 				end
 				local clubChannelId = GetCommunityChannelByName(name)
 				if not clubChannelId then
-					F.Print(format(L["Club channel %s no found, please use the full name of the channel."], name))
+					WarnOnce("club:" .. name, format(L["Club channel %s no found, please use the full name of the channel."], name))
 				else
 					local currentText = DefaultChatFrame.editBox:GetText()
 					local command = format("/%s ", clubChannelId)

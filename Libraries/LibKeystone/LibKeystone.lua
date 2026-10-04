@@ -12,12 +12,21 @@ local callbackMap = LKS.callbackMap
 local type, error = type, error
 
 do
-	local registerPrefix = C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix or RegisterAddonMessagePrefix
-	if not registerPrefix then return end
-	local result = registerPrefix("LibKS")
-	-- 0=success, 1=duplicate, 2=invalid, 3=toomany
-	if type(result) == "number" and result > 1 then
-		error("LibKeystone: Failed to register the addon prefix.")
+	-- Prefix registration exists from Cataclysm onward (C_ChatInfo, then
+	-- RegisterAddonMessagePrefix). The classic 3.3.5a protocol has no prefix
+	-- registry at all -- every addon message is delivered and filtered by
+	-- prefix in the CHAT_MSG_ADDON handler -- so there is nothing to register
+	-- and nothing can fail. (This block used to `return` out of the whole file
+	-- on this client and silently killed the library.)
+	local registerPrefix = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix)
+		or (type(RegisterAddonMessagePrefix) == "function" and RegisterAddonMessagePrefix)
+		or nil
+	if registerPrefix then
+		local result = registerPrefix("LibKS")
+		-- 0=success, 1=duplicate, 2=invalid, 3=toomany
+		if type(result) == "number" and result > 1 then
+			error("LibKeystone: Failed to register the addon prefix.")
+		end
 	end
 end
 
@@ -50,23 +59,73 @@ end
 
 local GetInfo
 do
-	-- Normal APIs
+	-- Normal APIs. Retail exposes the owned keystone as two separate getters;
+	-- the modified 3.3.5a client (FrameXML/Utils/C_Mythic.lua) exposes it as
+	-- C_MythicPlus.GetOwnerKeystoneInfo() -> itemID, mapChallengeModeID, level, affixIDs.
 	local GetOwnedKeystoneLevel, GetOwnedKeystoneChallengeMapID = C_MythicPlus and C_MythicPlus.GetOwnedKeystoneLevel, C_MythicPlus and C_MythicPlus.GetOwnedKeystoneChallengeMapID
+	local GetOwnerKeystoneInfo = C_MythicPlus and C_MythicPlus.GetOwnerKeystoneInfo
+	-- WindTools: the modified 3.3.5a client does not implement
+	-- C_PlayerInfo.GetPlayerMythicPlusRatingSummary (calling it used to abort every
+	-- GetInfo(), and with it every request). The client runs its own Mythic+ system
+	-- in FrameXML/Utils/C_Mythic.lua and reports the score through C_ChallengeMode
+	-- and C_MythicPlus, so the rating is read from those instead.
 	local GetPlayerMythicPlusRatingSummary = C_PlayerInfo and C_PlayerInfo.GetPlayerMythicPlusRatingSummary
+	local function GetPlayerRating()
+		if GetPlayerMythicPlusRatingSummary then
+			local summary = GetPlayerMythicPlusRatingSummary("player")
+			if type(summary) == "table" and type(summary.currentSeasonScore) == "number" then
+				return summary.currentSeasonScore
+			end
+			return 0
+		end
+
+		local api = _G.C_ChallengeMode
+		if api and type(api.GetOverallDungeonScore) == "function" then
+			local score = api.GetOverallDungeonScore()
+			if type(score) == "number" then
+				return score
+			end
+		end
+
+		api = _G.C_MythicPlus
+		if api and type(api.GetSeasonBestMythicRating) == "function" then
+			local score = api.GetSeasonBestMythicRating()
+			if type(score) == "number" then
+				return score
+			end
+		end
+
+		return 0
+	end
 
 	-- Timerunning APIs
 	local GetContainerNumSlots, GetContainerItemID, GetContainerItemLink = C_Container and C_Container.GetContainerNumSlots, C_Container and C_Container.GetContainerItemID, C_Container and C_Container.GetContainerItemLink
 	local IsItemKeystoneByID, PlayerIsTimerunning = C_Item and C_Item.IsItemKeystoneByID, PlayerIsTimerunning
 	local strsplit = string.split
 	function GetInfo()
+		-- Client-native path first: GetOwnerKeystoneInfo returns the full
+		-- keystone state without bag scanning.
+		if GetOwnerKeystoneInfo then
+			local ok, _, keyChallengeMapID, keyLevel = pcall(GetOwnerKeystoneInfo)
+			if ok then
+				if type(keyLevel) ~= "number" then
+					keyLevel = 0
+				end
+				if type(keyChallengeMapID) ~= "number" then
+					keyChallengeMapID = 0
+				end
+				return keyLevel, keyChallengeMapID, GetPlayerRating()
+			end
+		end
+
 		-- Keystone level
-		local keyLevel = GetOwnedKeystoneLevel()
+		local keyLevel = GetOwnedKeystoneLevel and GetOwnedKeystoneLevel() or 0
 		if type(keyLevel) ~= "number" then
 			keyLevel = 0
 		end
 		-- Keystone challenge ID [https://wago.tools/db2/MapChallengeMode]
 		-- You can pass this ID into `C_ChallengeMode.GetMapUIInfo()` to get info like the name
-		local keyChallengeMapID = GetOwnedKeystoneChallengeMapID()
+		local keyChallengeMapID = GetOwnedKeystoneChallengeMapID and GetOwnedKeystoneChallengeMapID() or 0
 		if type(keyChallengeMapID) ~= "number" then
 			keyChallengeMapID = 0
 		end
@@ -94,11 +153,7 @@ do
 		end
 
 		-- M+ rating
-		local playerRatingSummary = GetPlayerMythicPlusRatingSummary("player")
-		local playerRating = 0
-		if type(playerRatingSummary) == "table" and type(playerRatingSummary.currentSeasonScore) == "number" then
-			playerRating = playerRatingSummary.currentSeasonScore
-		end
+		local playerRating = GetPlayerRating()
 		return keyLevel, keyChallengeMapID, playerRating
 	end
 end

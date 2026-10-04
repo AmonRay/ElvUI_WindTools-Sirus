@@ -384,8 +384,16 @@ function RM:CreateButtons()
 				animGroup:Stop()
 				tex.__fromScale = currentScale
 				tex.__toScale = RM.db.buttonAnimationScale
-				scaleAnim:SetScaleFrom(currentScale, currentScale)
-				scaleAnim:SetScaleTo(RM.db.buttonAnimationScale, RM.db.buttonAnimationScale)
+				if scaleAnim.SetScaleFrom and scaleAnim.SetScaleTo then
+					-- Retail absolute from/to semantics.
+					scaleAnim:SetScaleFrom(currentScale, currentScale)
+					scaleAnim:SetScaleTo(RM.db.buttonAnimationScale, RM.db.buttonAnimationScale)
+				else
+					-- Classic Scale:SetScale is a multiplier; the group's OnPlay
+					-- script resets the texture scale to 1, so the multiplier
+					-- equals the absolute target.
+					scaleAnim:SetScale(RM.db.buttonAnimationScale, RM.db.buttonAnimationScale)
+				end
 				scaleAnim:SetDuration(
 					(tex.__toScale - currentScale) / (tex.__toScale - 1) * RM.db.buttonAnimationDuration
 				)
@@ -412,8 +420,12 @@ function RM:CreateButtons()
 				animGroup:Stop()
 				tex.__fromScale = currentScale
 				tex.__toScale = 1
-				scaleAnim:SetScaleFrom(currentScale, currentScale)
-				scaleAnim:SetScaleTo(1, 1)
+				if scaleAnim.SetScaleFrom and scaleAnim.SetScaleTo then
+					scaleAnim:SetScaleFrom(currentScale, currentScale)
+					scaleAnim:SetScaleTo(1, 1)
+				else
+					scaleAnim:SetScale(1, 1)
+				end
 				scaleAnim:SetDuration(
 					RM.db.buttonAnimationDuration * (currentScale - 1) / (RM.db.buttonAnimationScale - 1)
 				)

@@ -8,9 +8,17 @@ function S:PetBattle()
 		return
 	end
 
+	-- Pet battles were introduced in MoP; the 3.3.5a client has neither
+	-- PetBattleFrame nor ElvUIPetBattleActionBar, so this retail-only skin is a
+	-- no-op there instead of an "attempt to index a nil value" error.
 	local f = _G.PetBattleFrame
-	local bf = f.BottomFrame
 	local actionBar = _G.ElvUIPetBattleActionBar
+	if not (f and actionBar and f.BottomFrame and f.ActiveAlly and f.ActiveEnemy) then
+		W.Compatibility:Report("PetBattle", L["This client has no pet battle frame, so the pet battle UI skin is skipped."])
+		return
+	end
+
+	local bf = f.BottomFrame
 
 	self:CreateShadow(actionBar)
 
@@ -20,18 +28,18 @@ function S:PetBattle()
 		actionBar.shadow:Point("BOTTOMRIGHT", actionBar, "BOTTOMRIGHT", 5, -5)
 	end
 
-	self:CreateBackdropShadow(_G.PetBattleFrame.ActiveAlly.ActualHealthBar)
-	self:CreateBackdropShadow(_G.PetBattleFrame.ActiveAlly.Icon)
-	F.SetFont(_G.PetBattleFrame.ActiveAlly.Name)
+	self:CreateBackdropShadow(f.ActiveAlly.ActualHealthBar)
+	self:CreateBackdropShadow(f.ActiveAlly.Icon)
+	F.SetFont(f.ActiveAlly.Name)
 
-	self:CreateBackdropShadow(_G.PetBattleFrame.ActiveEnemy.ActualHealthBar)
-	self:CreateBackdropShadow(_G.PetBattleFrame.ActiveEnemy.Icon)
-	F.SetFont(_G.PetBattleFrame.ActiveEnemy.Name)
+	self:CreateBackdropShadow(f.ActiveEnemy.ActualHealthBar)
+	self:CreateBackdropShadow(f.ActiveEnemy.Icon)
+	F.SetFont(f.ActiveEnemy.Name)
 
-	self:CreateShadow(_G.PetBattleFrame.Ally2)
-	self:CreateShadow(_G.PetBattleFrame.Ally3)
-	self:CreateShadow(_G.PetBattleFrame.Enemy2)
-	self:CreateShadow(_G.PetBattleFrame.Enemy3)
+	self:CreateShadow(f.Ally2)
+	self:CreateShadow(f.Ally3)
+	self:CreateShadow(f.Enemy2)
+	self:CreateShadow(f.Enemy3)
 end
 
 S:AddCallback("PetBattle")

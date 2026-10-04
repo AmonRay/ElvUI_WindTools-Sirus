@@ -1,6 +1,12 @@
 local W, F, E = unpack((select(2, ...))) ---@type WindTools, Functions, ElvUI
 
 local _G = _G
+local pairs = pairs
+local sort = sort
+local strsub = strsub
+local tinsert = tinsert
+local type = type
+
 local Compatibility = {}
 
 -- Ambiguate is a retail helper; the 3.3.5a client has no such global. Install a
@@ -280,7 +286,8 @@ Compatibility.HasModernUnitAPI = type(_G.UnitHealthPercent) == "function" and ty
 Compatibility.HasModernCollectionsAPI = isNativeNamespace("C_MountJournal") or isNativeNamespace("C_ToyBox")
 Compatibility.HasModernSettingsAPI = type(_G.Settings) == "table"
 -- Retail scroll box helpers (CreateDataProvider / CreateScrollBoxListLinearView)
--- are absent on Wrath; modules that build a ScrollBox UI cannot run there.
+-- are absent on this client. WindTools builds its lists on the native ScrollFrame
+-- instead, so only the probe is kept, for the compatibility report.
 Compatibility.HasScrollBoxAPI = type(_G.CreateDataProvider) == "function" and type(_G.CreateScrollBoxListLinearView) == "function"
 Compatibility.HasModernCinematicAPI = type(_G.EventRegistry) == "table" and type(_G.MovieFrame_PlayMovie) == "function" and type(_G.Enum) == "table" and type(_G.Enum.CinematicType) == "table"
 Compatibility.HasSpellActivationOverlay = type(_G.SpellActivationOverlayFrame) == "table" and type(_G.SpellActivationOverlayFrame.ShowOverlay) == "function"
@@ -297,6 +304,58 @@ if type(E.IsSecretValue) ~= "function" then
 	function E:NotSecretValue()
 		return true
 	end
+end
+
+-- Compatibility report ------------------------------------------------------------
+-- WindTools used to fail silently on this client: a module whose client APIs are
+-- missing was either never registered (see W.ModuleRequirements) or bailed out of
+-- its own guard, and nothing told the user which feature is gone or why. Every
+-- such decision is recorded here instead, and Modules/Compat/SirusCompat.lua
+-- renders the result in the options.
+
+---@class CompatibilityReportEntry
+---@field key string Module or feature name, matching the in-game error messages
+---@field reason? string Human readable reason, already localized
+---@field capabilities? string[] Capability probes whose absence disabled the feature
+
+---@type table<string, CompatibilityReportEntry>
+Compatibility.Reports = {}
+
+--- Records why a feature is not available on this client. Repeated calls for the
+--- same key are ignored so the first (most precise) reason wins.
+---@param key string Module or feature name
+---@param reason? string Localized reason; omit when capabilities already explain it
+---@param capabilities? string[] Capability probes that this client does not provide
+function Compatibility:Report(key, reason, capabilities)
+	if type(key) ~= "string" or key == "" or self.Reports[key] then
+		return
+	end
+
+	self.Reports[key] = {
+		key = key,
+		reason = reason,
+		capabilities = capabilities,
+	}
+end
+
+--- Snapshot of every Has* capability probe, sorted by name.
+---@return { name: string, available: boolean }[]
+function Compatibility:GetCapabilityReport()
+	local report = {}
+	for key, value in pairs(self) do
+		if type(key) == "string" and strsub(key, 1, 3) == "Has" then
+			tinsert(report, {
+				name = key,
+				available = value and true or false,
+			})
+		end
+	end
+
+	sort(report, function(a, b)
+		return a.name < b.name
+	end)
+
+	return report
 end
 
 W.Compatibility = Compatibility

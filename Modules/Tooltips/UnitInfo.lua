@@ -7,7 +7,7 @@ local format = format
 local ipairs = ipairs
 local strfind = strfind
 
-local GetCreatureDifficultyColor = GetCreatureDifficultyColor
+local GetQuestDifficultyColor = GetQuestDifficultyColor
 local GetGuildInfo = GetGuildInfo
 -- UnitEffectiveLevel is Cata+; on 3.3.5a fall back to UnitLevel, and as a last
 -- resort to a no-op so the upvalue can never be nil on any client.
@@ -41,7 +41,9 @@ function T:SetUnitText(_, tt, unit, isPlayerUnit)
 	local level, realLevel = UnitEffectiveLevel(unit), UnitLevel(unit)
 
 	if levelLine then
-		local diffColor = GetCreatureDifficultyColor(level)
+		-- GetCreatureDifficultyColor is a later addition; 3.3.5a uses
+		-- GetQuestDifficultyColor for the level-based difficulty colour.
+		local diffColor = GetQuestDifficultyColor(level)
 		local race, englishRace = UnitRace(unit)
 		local gender = UnitSex(unit)
 		local _, localizedFaction = E:GetUnitBattlefieldFaction(unit)

@@ -1,46 +1,65 @@
 local W ---@class WindTools
-local F, E ---@type Functions, ElvUI
-W, F, E = unpack((select(2, ...)))
+local F, E, L ---@type Functions, ElvUI, LocaleTable
+W, F, E, L = unpack((select(2, ...)))
 
 local KI = W:NewModule("KeystoneInfo", "AceEvent-3.0") ---@class KeystoneInfo : AceModule, AceEvent-3.0
-local OR = E.Libs.OpenRaid
-local KS = E.Libs.Keystone
 
--- Both libraries are optional on Wrath. Keep this module inert when they are
--- unavailable instead of failing while Core files are evaluated.
+-- Keystone exchange on this client
+-- --------------------------------
+-- The modified 3.3.5a client implements Mythic+ itself (FrameXML/Utils/C_Mythic.lua),
+-- so the keystone of the local player comes straight from the client:
+--
+--   C_MythicPlus.GetOwnerKeystoneInfo() -> itemID, mapChallengeModeID, level, affixIDs
+--   C_MythicPlus.GetOwnerKeystoneTime() -> seconds until the keystone expires
+--   GetContainerItemLink(bag, slot)     -> |Hkeystone:itemID:randomPropertyID:mapID:level:affixes|h
+--                                          (the client rebuilds that link for the owned
+--                                          keystone in SharedXML/Utils/C_Item.lua)
+--
+-- The client never publishes another player's keystone, so group data still comes
+-- from LibKeystone (the BigWigs library) - the same exchange BigWigs and Details
+-- use on this realm. LibOpenRaid is not used here at all: it is a retail library
+-- and stays opt-in on this client (see Preflight.lua).
+local KS = E.Libs.Keystone
+local hasKeystoneExchange = type(KS) == "table"
+	and type(KS.Register) == "function"
+	and type(KS.Request) == "function"
 
 local select = select
-local strsplit = strsplit
+local strfind = strfind
+local strmatch = strmatch
 local tonumber = tonumber
+local type = type
 
-local Ambiguate = Ambiguate or function(name)
-	if type(name) ~= "string" then
-		return name
-	end
-	return (name:match("^([^%-]+)") or name)
-end
-local GetInstanceInfo = GetInstanceInfo
+local Ambiguate = Ambiguate
 local GetUnitName = GetUnitName
 local IsInGroup = IsInGroup
 local UnitIsPlayer = UnitIsPlayer
+local UnitIsUnit = UnitIsUnit
 
 local Compatibility = W.Compatibility
-local C_Container_GetContainerItemID = Compatibility.GetContainerItemID
-local C_Container_GetContainerItemLink = Compatibility.GetContainerItemLink
-local C_Container_GetContainerNumSlots = Compatibility.GetContainerNumSlots
-local C_Item_IsItemKeystoneByID = (_G.C_Item and _G.C_Item.IsItemKeystoneByID) or function() return false end
-local C_MythicPlus = _G.C_MythicPlus
-local C_MythicPlus_GetOwnedKeystoneChallengeMapID = C_MythicPlus and C_MythicPlus.GetOwnedKeystoneChallengeMapID or function() return nil end
-local C_MythicPlus_GetOwnedKeystoneLevel = C_MythicPlus and C_MythicPlus.GetOwnedKeystoneLevel or function() return nil end
+local GetContainerItemLink = Compatibility.GetContainerItemLink
+local GetContainerNumSlots = Compatibility.GetContainerNumSlots
 
-local LE_PARTY_CATEGORY_HOME = LE_PARTY_CATEGORY_HOME
 local NUM_BAG_SLOTS = NUM_BAG_SLOTS
+
+-- The client writes and reads keystone hyperlinks in its own layout:
+--   |c<rarity>|Hkeystone:itemID:randomPropertyID:mapChallengeModeID:level:affix1..5|h[name]|h|r
+-- so the map and the level are read from that suffix instead of splitting the
+-- whole link on ":" (the color prefix would otherwise shift every field).
+local KEYSTONE_LINK_PATTERN = "Hkeystone:%d+:%d+:(%d+):(%d+)"
+
+---@param link string?
+---@return boolean
+local function isKeystoneLink(link)
+	return type(link) == "string" and strfind(link, "Hkeystone:", 1, true) ~= nil
+end
 
 ---@class KeystoneInfoData
 ---@field level number
 ---@field challengeMapID number
 ---@field rating number
 
+---Keystones other players reported through LibKeystone, keyed by short name.
 ---@type table<string, KeystoneInfoData>
 KI.LibKeystoneInfo = {}
 
@@ -49,12 +68,34 @@ KI.LibKeystoneInfo = {}
 ---@field mapID number?
 KI.PlayerKeystone = {}
 
+---The keystone the player owns, according to the client's own Mythic+ bookkeeping.
+---@return number? challengeMapID
+---@return number? level
+---@return number? itemID
+function KI:GetOwnedKeystone()
+	local api = _G.C_MythicPlus
+	local method = api and api.GetOwnerKeystoneInfo
+	if type(method) ~= "function" then
+		return
+	end
+
+	local itemID, challengeMapID, level = method(api)
+	if type(challengeMapID) ~= "number" or type(level) ~= "number" or challengeMapID <= 0 or level <= 0 then
+		return
+	end
+
+	return challengeMapID, level, itemID
+end
+
+---A link carrying the keystone payload is the player's own keystone: the client
+---enriches only that one, every other keystone stays a plain item link.
+---@return string? link
 function KI:GetPlayerKeystoneLink()
 	for bagIndex = 0, NUM_BAG_SLOTS do
-		for slotIndex = 1, C_Container_GetContainerNumSlots(bagIndex) do
-			local itemID = C_Container_GetContainerItemID(bagIndex, slotIndex)
-			if itemID and C_Item_IsItemKeystoneByID(itemID) then
-				return C_Container_GetContainerItemLink(bagIndex, slotIndex)
+		for slotIndex = 1, GetContainerNumSlots(bagIndex) do
+			local link = GetContainerItemLink(bagIndex, slotIndex)
+			if isKeystoneLink(link) then
+				return link
 			end
 		end
 	end
@@ -65,107 +106,114 @@ end
 ---@return string? link
 function KI:GetPlayerKeystone()
 	local link = self:GetPlayerKeystoneLink()
-	if not link then
-		return nil, nil, nil
-	end
 
-	local challengeMapID = C_MythicPlus_GetOwnedKeystoneChallengeMapID and C_MythicPlus_GetOwnedKeystoneChallengeMapID()
-	local level = C_MythicPlus_GetOwnedKeystoneLevel and C_MythicPlus_GetOwnedKeystoneLevel()
-
-	if challengeMapID and level and challengeMapID > 0 and level > 0 then
+	-- The client's bookkeeping is authoritative: it updates as soon as the key is
+	-- created, before the container link is rebuilt from the item cache.
+	local challengeMapID, level = self:GetOwnedKeystone()
+	if challengeMapID and level then
 		return challengeMapID, level, link
 	end
 
-	local challengeMapID, level = select(4, strsplit(":", link))
-	if not challengeMapID or not level then
-		return nil, nil, link
+	-- Clients without the Mythic+ API can still describe the key through the link.
+	if link then
+		local mapID, keystoneLevel = strmatch(link, KEYSTONE_LINK_PATTERN)
+		mapID, keystoneLevel = tonumber(mapID), tonumber(keystoneLevel)
+		if mapID and keystoneLevel then
+			return mapID, keystoneLevel, link
+		end
 	end
 
-	local mapID = tonumber(challengeMapID)
-	local keystoneLevel = tonumber(level)
+	return nil, nil, link
+end
 
-	if not mapID or not keystoneLevel then
-		return nil, nil, link
+---Asks the group (or the guild) for their keystones. The exchange itself belongs to
+---LibKeystone, which answers through the callback registered below.
+---@param channel "PARTY"|"GUILD"
+function KI:RequestPeerKeystones(channel)
+	if hasKeystoneExchange then
+		KS.Request(channel)
 	end
-
-	return mapID, keystoneLevel, link
 end
 
 ---@param skipEmit boolean? the flag to skip sending custom message to other modules
 function KI:RequestAndCheckPlayerKeystone(skipEmit)
-	self.RequestData()
+	self:RequestData()
 	self:CheckPlayerKeystone(skipEmit)
 end
 
 ---@param skipEmit boolean? the flag to skip sending custom message to other modules
 function KI:CheckPlayerKeystone(skipEmit)
-	local mapID, level, link = self:GetPlayerKeystone()
+	local challengeMapID, level, link = self:GetPlayerKeystone()
 
-	if self.PlayerKeystone.mapID ~= mapID or self.PlayerKeystone.level ~= level then
+	if self.PlayerKeystone.mapID ~= challengeMapID or self.PlayerKeystone.level ~= level then
 		if not skipEmit then
-			self:SendMessage("WINDTOOLS_PLAYER_KEYSTONE_CHANGED", mapID, level, link)
+			self:SendMessage("WINDTOOLS_PLAYER_KEYSTONE_CHANGED", challengeMapID, level, link)
 		end
 
-		KS.Request("GUILD")
+		self:RequestPeerKeystones("GUILD")
 	end
 
-	self.PlayerKeystone.mapID, self.PlayerKeystone.level = mapID, level
+	self.PlayerKeystone.mapID, self.PlayerKeystone.level = challengeMapID, level
 end
 
 function KI:DelayedCheckPlayerKeystone()
 	E:Delay(0.5, KI.CheckPlayerKeystone, KI)
 end
 
-function KI.RequestData()
-	-- Disable in Delve
-	local difficulty = select(3, GetInstanceInfo())
-	if difficulty and difficulty == 208 then
-		return
-	end
-
-	if not OR.RequestKeystoneDataFromRaid() then
-		if IsInGroup(LE_PARTY_CATEGORY_HOME) then
-			KS.Request("PARTY")
-		end
-		OR.RequestKeystoneDataFromParty()
+function KI:RequestData()
+	if IsInGroup() then
+		self:RequestPeerKeystones("PARTY")
 	end
 end
-
-if not KS then
-	function KI:OnEnable() end
-	return
-end
-
-if not KS or type(KS.Register) ~= "function" then
-	function KI:OnEnable() end
-	return
-end
-
-KS.Register(KI, function(keyLevel, keyChallengeMapID, playerRating, sender)
-	KI.LibKeystoneInfo[sender] = {
-		level = keyLevel,
-		challengeMapID = keyChallengeMapID,
-		rating = playerRating,
-	}
-end)
 
 ---@param unit UnitToken
 ---@return KeystoneInfoData?
 function KI:UnitData(unit)
-	if E:IsSecretValue(unit) or not unit or not UnitIsPlayer(unit) then
+	if not unit or E:IsSecretValue(unit) or not UnitIsPlayer(unit) then
 		return
 	end
 
-	local data = OR and OR.GetKeystoneInfo and OR.GetKeystoneInfo(unit)
+	local name = GetUnitName(unit, true)
+	local sender = name and Ambiguate(name, "none")
+	if not sender then
+		return
+	end
 
-	-- If Details! library no returns data, try to get it from Bigwigs library
-	if self.LibKeystoneInfo and (not data or not data.level or data.level == 0) then
-		local name = GetUnitName(unit, true)
-		local sender = name and Ambiguate(name, "none")
-		data = sender and self.LibKeystoneInfo[sender]
+	local data = self.LibKeystoneInfo[sender]
+	if data and data.level and data.level > 0 then
+		return data
+	end
+
+	-- The player's own keystone never needs the exchange, the client knows it.
+	if unit == "player" or (UnitIsUnit and UnitIsUnit(unit, "player")) then
+		local challengeMapID, level = self:GetPlayerKeystone()
+		if challengeMapID and level then
+			return {
+				challengeMapID = challengeMapID,
+				level = level,
+				rating = (data and data.rating) or 0,
+			}
+		end
 	end
 
 	return data
+end
+
+if hasKeystoneExchange then
+	KS.Register(KI, function(keyLevel, keyChallengeMapID, playerRating, sender)
+		KI.LibKeystoneInfo[sender] = {
+			level = keyLevel,
+			challengeMapID = keyChallengeMapID,
+			rating = playerRating,
+		}
+	end)
+else
+	-- Only the player's own keystone can be reported without the exchange.
+	W.Compatibility:Report(
+		"KeystoneInfo",
+		L["LibKeystone did not load, so keystones of other players cannot be exchanged; only your own keystone is shown."],
+		{ "LibKeystone" }
+	)
 end
 
 KI:RegisterEvent("GROUP_ROSTER_UPDATE", "RequestData")

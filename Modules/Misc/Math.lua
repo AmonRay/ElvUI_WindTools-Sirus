@@ -7,8 +7,19 @@ local wipe = wipe
 local CreateAbbreviateConfig = CreateAbbreviateConfig
 
 function M:Math()
-	if E.private.WT.misc.noKanjiMath then
-		hooksecurefunc(E, "BuildAbbreviateConfigs", function()
+	if not E.private.WT.misc.noKanjiMath then
+		return
+	end
+
+	-- BuildAbbreviateConfigs / CreateAbbreviateConfig are ElvUI helpers that this
+	-- 3.3.5a fork does not implement. The Kanji abbreviation override cannot be
+	-- applied without them, so skip the tweak instead of hooking a method that
+	-- does not exist (hooksecurefunc on a missing target is an error).
+	if type(E.BuildAbbreviateConfigs) ~= "function" or type(CreateAbbreviateConfig) ~= "function" then
+		return
+	end
+
+	hooksecurefunc(E, "BuildAbbreviateConfigs", function()
 			if not (E.db.general.numberPrefixStyle == "CHINESE" or E.db.general.numberPrefixStyle == "TCHINESE") then
 				return
 			end
@@ -55,8 +66,7 @@ function M:Math()
 			wipe(short.breakpoints)
 		end)
 
-		E:BuildAbbreviateConfigs()
-	end
+	E:BuildAbbreviateConfigs()
 end
 
 M:AddCallback("Math")

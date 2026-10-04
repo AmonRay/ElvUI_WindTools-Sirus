@@ -10,83 +10,99 @@ local pairs = pairs
 local select = select
 local sort = sort
 local strlower = strlower
+local strmatch = strmatch
 local strsub = strsub
 local tinsert = tinsert
 local tonumber = tonumber
 
 local AbbreviateNumbers = AbbreviateNumbers
-local BNGetNumFriends = BNGetNumFriends
+local BNGetFriendInfoByID = BNGetFriendInfoByID
+local BNGetToonInfo = BNGetToonInfo
 local BNSendWhisper = BNSendWhisper
 local CanGuildInvite = CanGuildInvite
-local GenerateClosure = GenerateClosure
 local GetAverageItemLevel = GetAverageItemLevel
 local GetCombatRatingBonus = GetCombatRatingBonus
 local GetCritChance = GetCritChance
-local GetHaste = GetHaste
-local GetLifesteal = GetLifesteal
-local GetMasteryEffect = GetMasteryEffect
 local GetRangedCritChance = GetRangedCritChance
 local GetSpellCritChance = GetSpellCritChance
-local GetVersatilityBonus = GetVersatilityBonus
-local IsControlKeyDown = IsControlKeyDown
+local BNET_CLIENT_WOW = _G.BNET_CLIENT_WOW or "WoW" -- FrameXML/FriendsFrame.lua
+local GuildInvite = GuildInvite
+local SendWho = SendWho
+local UnitAttackPower = UnitAttackPower
 local UnitClass = UnitClass
 local UnitHealthMax = UnitHealthMax
+local UnitName = UnitName
 local UnitPlayerControlled = UnitPlayerControlled
 
-local C_BattleNet_GetFriendAccountInfo = C_BattleNet and C_BattleNet.GetFriendAccountInfo or function() return nil end
-local C_BattleNet_GetFriendGameAccountInfo = C_BattleNet and C_BattleNet.GetFriendGameAccountInfo or function() return nil end
-local C_BattleNet_GetFriendNumGameAccounts = C_BattleNet and C_BattleNet.GetFriendNumGameAccounts or function() return 0 end
-local C_ChatInfo_SendChatMessage = W.Compatibility.SendChatMessage or function() end
-local C_Club_GetGuildClubId = C_Club and C_Club.GetGuildClubId or function() return nil end
-local C_FriendList_SendWho = C_FriendList and C_FriendList.SendWho or SendWho or function() end
-local C_GuildInfo_Invite = C_GuildInfo and C_GuildInfo.Invite or GuildInvite or function() end
-local Menu_ModifyMenu = Menu.ModifyMenu
+local SendChatMessage = W.Compatibility.SendChatMessage or function() end
 
-local CR_VERSATILITY_DAMAGE_DONE = CR_VERSATILITY_DAMAGE_DONE
-local HP = HP
-local ITEM_LEVEL_ABBR = ITEM_LEVEL_ABBR
-local STAT_CRITICAL_STRIKE = STAT_CRITICAL_STRIKE
-local STAT_HASTE = STAT_HASTE
-local STAT_LIFESTEAL = STAT_LIFESTEAL
-local STAT_MASTERY = STAT_MASTERY
-local STAT_VERSATILITY = STAT_VERSATILITY
-local TEXT_MODE_A_STRING_RESULT_CRITICAL = TEXT_MODE_A_STRING_RESULT_CRITICAL
+-- This client builds unit popups from the classic UnitPopupMenus / UnitPopupButtons
+-- tables (see FrameXML/UnitPopup.lua), keyed by "which" (PARTY, PLAYER, ...).
+-- The retail build of this module registered "MENU_UNIT_<which>" tags with
+-- Menu.ModifyMenu and appended buttons to a MenuDescription; on this client the
+-- unit popup is not driven by the Menu framework at all, so no MENU_UNIT_* tag is
+-- ever published and a Menu.ModifyMenu callback would never fire. The section is
+-- therefore registered through the classic tables and the visibility/click hooks.
+local UnitPopupButtons = _G.UnitPopupButtons
+local UnitPopupMenus = _G.UnitPopupMenus
+local UnitPopupShown = _G.UnitPopupShown
 
-local function getRetailCharacterNamesFromGameAccountInfo(gameAccountInfo)
-	if gameAccountInfo.clientProgram == "WoW" and gameAccountInfo.wowProjectID == 1 then
-		local name = gameAccountInfo.characterName
-		if gameAccountInfo.realmName == "" or gameAccountInfo.realmName == nil then
-			return name
-		end
-		return gameAccountInfo.characterName .. "-" .. gameAccountInfo.realmName
-	end
+local BUTTON_PREFIX = "WINDTOOLS_"
+local SECTION_TITLE_KEY = BUTTON_PREFIX .. "SECTION_TITLE"
+
+local function featureButtonKey(feature)
+	return BUTTON_PREFIX .. feature
 end
 
-local function getRetailCharacterNamesByBNetID(id)
-	local numBNOnlineFriend = select(2, BNGetNumFriends())
-	for i = 1, numBNOnlineFriend do
-		local accountInfo = C_BattleNet_GetFriendAccountInfo(i)
-		if
-			accountInfo
-			and accountInfo.bnetAccountID == id
-			and accountInfo.gameAccountInfo
-			and accountInfo.gameAccountInfo.isOnline
-		then
-			local numGameAccounts = C_BattleNet_GetFriendNumGameAccounts(i)
-			local name
-			if numGameAccounts and numGameAccounts > 0 then
-				for j = 1, numGameAccounts do
-					if name then
-						break
-					end
-					local gameAccountInfo = C_BattleNet_GetFriendGameAccountInfo(i, j)
-					name = gameAccountInfo and getRetailCharacterNamesFromGameAccountInfo(gameAccountInfo)
-				end
-			else
-				name = getRetailCharacterNamesFromGameAccountInfo(accountInfo.gameAccountInfo)
-			end
-			return name
+local function featureFromButtonKey(key)
+	return strmatch(key, "^" .. BUTTON_PREFIX .. "(.+)$")
+end
+
+-- Wrath identifies a Battle.net friend by presenceID and exposes its characters
+-- through BNGetFriendInfoByID / BNGetToonInfo. The retail C_BattleNet helpers
+-- (GetFriendAccountInfo / GetFriendGameAccountInfo / GetFriendNumGameAccounts and
+-- the gameAccountInfo.clientProgram / wowProjectID / characterName / realmName
+-- fields) do not exist on 3.3.5a.
+local function GetBNetCharacterName(presenceID)
+	if not presenceID then
+		return
+	end
+
+	-- BNGetFriendInfoByID: presenceID, givenName, surname, toonName, toonID, client, isOnline, ...
+	local _, _, _, toonName, toonID, client, isOnline = BNGetFriendInfoByID(presenceID)
+	if not isOnline or client ~= BNET_CLIENT_WOW then
+		return
+	end
+
+	local realmName
+	if toonID then
+		-- BNGetToonInfo: hasFocus, toonName, client, realmName, faction, ...
+		local _, infoToonName, _, infoRealmName = BNGetToonInfo(toonID)
+		toonName = infoToonName or toonName
+		realmName = infoRealmName
+	end
+
+	if not toonName or toonName == "" then
+		return
+	end
+
+	if realmName and realmName ~= "" then
+		return format("%s-%s", toonName, realmName)
+	end
+
+	return toonName
+end
+
+local function GetPlayerNameFromContext(contextData)
+	if contextData.chatTarget then
+		return contextData.chatTarget
+	end
+
+	if contextData.name then
+		if contextData.server and contextData.server ~= "" and contextData.server ~= E.myrealm then
+			return format("%s-%s", contextData.name, contextData.server)
 		end
+		return contextData.name
 	end
 end
 
@@ -95,67 +111,26 @@ CM.Features = {
 		order = 1,
 		configKey = "guildInvite",
 		name = L["Guild Invite"],
+		-- Only the "which" values this client actually publishes; the retail
+		-- GUILD / GUILD_OFFLINE / ENEMY_PLAYER / WORLD_STATE_SCORE / COMMUNITIES_*
+		-- menus have no equivalent on 3.3.5a.
 		supportTypes = {
 			PARTY = true,
 			PLAYER = true,
 			RAID_PLAYER = true,
 			RAID = true,
 			FRIEND = true,
-			ENEMY_PLAYER = true,
 			BN_FRIEND = true,
 			CHAT_ROSTER = true,
 			TARGET = true,
 			FOCUS = true,
-			COMMUNITIES_WOW_MEMBER = true,
-			RAF_RECRUIT = true,
 		},
 		func = function(contextData)
-			if contextData.bnetIDAccount then
-				local numBNOnlineFriend = select(2, BNGetNumFriends())
-				for i = 1, numBNOnlineFriend do
-					local accountInfo = C_BattleNet_GetFriendAccountInfo(i)
-					if
-						accountInfo
-						and accountInfo.bnetAccountID == contextData.bnetIDAccount
-						and accountInfo.gameAccountInfo
-						and accountInfo.gameAccountInfo.isOnline
-					then
-						local numGameAccounts = C_BattleNet_GetFriendNumGameAccounts(i)
-						if numGameAccounts and numGameAccounts > 0 then
-							for j = 1, numGameAccounts do
-								local gameAccountInfo = C_BattleNet_GetFriendGameAccountInfo(i, j)
-								if
-									gameAccountInfo
-									and gameAccountInfo.clientProgram
-									and gameAccountInfo.clientProgram == "WoW"
-									and gameAccountInfo.wowProjectID == 1
-								then
-									C_GuildInfo_Invite(
-										gameAccountInfo.characterName .. "-" .. gameAccountInfo.realmName
-									)
-								end
-							end
-						elseif
-							accountInfo.gameAccountInfo.clientProgram == "WoW"
-							and accountInfo.gameAccountInfo.wowProjectID == 1
-						then
-							C_GuildInfo_Invite(
-								accountInfo.gameAccountInfo.characterName
-									.. "-"
-									.. accountInfo.gameAccountInfo.realmName
-							)
-						end
-						return
-					end
-				end
-			elseif contextData.chatTarget then
-				C_GuildInfo_Invite(contextData.chatTarget)
-			elseif contextData.name then
-				local playerName = contextData.name
-				if contextData.server and contextData.server ~= E.myrealm then
-					playerName = playerName .. "-" .. contextData.server
-				end
-				C_GuildInfo_Invite(playerName)
+			local playerName = contextData.presenceID and GetBNetCharacterName(contextData.presenceID)
+				or GetPlayerNameFromContext(contextData)
+
+			if playerName then
+				GuildInvite(playerName)
 			else
 				CM:Log("debug", "Cannot get the name.")
 			end
@@ -165,15 +140,8 @@ CM.Features = {
 				return true
 			end
 
-			if contextData.communityClubID then
-				if tonumber(contextData.communityClubID) == tonumber(C_Club_GetGuildClubId()) then
-					return true
-				end
-			end
-
 			if contextData.which == "BN_FRIEND" then
-				local name = contextData.bnetIDAccount and getRetailCharacterNamesByBNetID(contextData.bnetIDAccount)
-				if not name then
+				if not GetBNetCharacterName(contextData.presenceID) then
 					return true
 				end
 			end
@@ -209,26 +177,15 @@ CM.Features = {
 			RAID_PLAYER = true,
 			RAID = true,
 			FRIEND = true,
-			GUILD = true,
-			GUILD_OFFLINE = true,
 			CHAT_ROSTER = true,
 			TARGET = true,
 			ARENAENEMY = true,
 			FOCUS = true,
-			WORLD_STATE_SCORE = true,
-			COMMUNITIES_WOW_MEMBER = true,
-			COMMUNITIES_GUILD_MEMBER = true,
-			RAF_RECRUIT = true,
 		},
 		func = function(contextData)
-			if contextData.chatTarget then
-				C_FriendList_SendWho(contextData.chatTarget)
-			elseif contextData.name then
-				local playerName = contextData.name
-				if contextData.server and contextData.server ~= E.myrealm then
-					playerName = playerName .. "-" .. contextData.server
-				end
-				C_FriendList_SendWho(playerName)
+			local playerName = GetPlayerNameFromContext(contextData)
+			if playerName then
+				SendWho(playerName)
 			else
 				CM:Log("debug", "Cannot get the name.")
 			end
@@ -266,20 +223,14 @@ CM.Features = {
 			RAID_PLAYER = true,
 			RAID = true,
 			FRIEND = true,
-			GUILD = true,
-			GUILD_OFFLINE = true,
 			CHAT_ROSTER = true,
 			TARGET = true,
 			ARENAENEMY = true,
 			FOCUS = true,
-			WORLD_STATE_SCORE = true,
-			COMMUNITIES_WOW_MEMBER = true,
-			COMMUNITIES_GUILD_MEMBER = true,
-			RAF_RECRUIT = true,
 		},
-		func = function(frame)
-			local name = frame.name
-			local server = frame.server or E.myrealm
+		func = function(contextData)
+			local name = contextData.name
+			local server = contextData.server or E.myrealm
 			local slug = server and W.RealmSlugs[server]
 
 			if name and slug then
@@ -315,30 +266,23 @@ CM.Features = {
 			RAID_PLAYER = true,
 			FRIEND = true,
 			BN_FRIEND = true,
-			GUILD = true,
 			CHAT_ROSTER = true,
 			TARGET = true,
 			FOCUS = true,
-			COMMUNITIES_WOW_MEMBER = true,
-			COMMUNITIES_GUILD_MEMBER = true,
-			RAF_RECRUIT = true,
 		},
 		func = function(contextData)
 			local name
-			local _SendChatMessage = C_ChatInfo_SendChatMessage
+			local _SendChatMessage = SendChatMessage
 
-			if contextData.bnetIDAccount then
+			-- Wrath whispers to a Battle.net friend go through BNSendWhisper(presenceID, text),
+			-- there is no bnetIDAccount to address.
+			if contextData.presenceID then
 				_SendChatMessage = function(message)
-					BNSendWhisper(contextData.bnetIDAccount, message)
+					BNSendWhisper(contextData.presenceID, message)
 				end
 				name = "BN"
-			elseif contextData.chatTarget then
-				name = contextData.chatTarget
-			elseif contextData.name then
-				name = contextData.name
-				if contextData.server and contextData.server ~= E.myrealm then
-					name = name .. "-" .. contextData.server
-				end
+			else
+				name = GetPlayerNameFromContext(contextData)
 			end
 
 			if not name then
@@ -346,27 +290,31 @@ CM.Features = {
 				return
 			end
 
-			local CRITICAL = gsub(TEXT_MODE_A_STRING_RESULT_CRITICAL or STAT_CRITICAL_STRIKE, "[()]", "")
+			local CRITICAL = gsub(_G.TEXT_MODE_A_STRING_RESULT_CRITICAL or "Critical", "[()]", "")
+
+			-- Mastery, versatility and lifesteal do not exist on 3.3.5a and the
+			-- client ships no GetMasteryEffect/GetVersatilityBonus/GetLifesteal, so
+			-- the report lists the ratings Wrath actually tracks: crit, haste and
+			-- attack power.
+			local haste = max(
+				GetCombatRatingBonus(_G.CR_HASTE_MELEE) or 0,
+				GetCombatRatingBonus(_G.CR_HASTE_RANGED) or 0,
+				GetCombatRatingBonus(_G.CR_HASTE_SPELL) or 0
+			)
 
 			for i, message in ipairs({
 				format(
 					"(%s) %s: %.1f %s: %s",
 					select(2, W.Compatibility.GetSpecializationInfo(W.Compatibility.GetSpecialization()))
 						.. select(1, UnitClass("player")),
-					ITEM_LEVEL_ABBR,
+					_G.ITEM_LEVEL_ABBR,
 					select(2, GetAverageItemLevel()),
-					HP,
+					_G.HP,
 					AbbreviateNumbers(UnitHealthMax("player"))
 				),
 				format(" * %s: %.2f%%", CRITICAL, max(GetRangedCritChance(), GetCritChance(), GetSpellCritChance())),
-				format(" * %s: %.2f%%", STAT_HASTE, GetHaste()),
-				format(" * %s: %.2f%%", STAT_MASTERY, GetMasteryEffect()),
-				format(
-					" * %s: %.2f%%",
-					STAT_VERSATILITY,
-					GetCombatRatingBonus(CR_VERSATILITY_DAMAGE_DONE) + GetVersatilityBonus(CR_VERSATILITY_DAMAGE_DONE)
-				),
-				format(" * %s:%.2f%%", STAT_LIFESTEAL, GetLifesteal()),
+				format(" * %s: %.2f%%", _G.SPELL_HASTE, haste),
+				format(" * %s: %d", _G.MELEE_ATTACK_POWER, select(1, UnitAttackPower("player")) or 0),
 			}) do
 				E:Delay(0.1 + i * 0.2, function()
 					_SendChatMessage(message, "WHISPER", nil, name)
@@ -382,6 +330,12 @@ CM.Features = {
 
 			if contextData.unit and contextData.unit == "focus" then
 				if not UnitPlayerControlled("focus") then
+					return true
+				end
+			end
+
+			if contextData.which == "BN_FRIEND" then
+				if not contextData.presenceID then
 					return true
 				end
 			end
@@ -429,6 +383,23 @@ function CM:GetArmoryBaseURL()
 	)
 end
 
+--- The classic UnitPopup hands the dropdown frame to every consumer; the retail
+--- contextData table (which carried bnetIDAccount, communityClubID, ...) has no
+--- equivalent, so it is rebuilt from the fields the client populates itself.
+function CM:BuildContextData(dropdownMenu)
+	return {
+		which = dropdownMenu.which,
+		unit = dropdownMenu.unit,
+		name = dropdownMenu.name,
+		server = dropdownMenu.server,
+		userData = dropdownMenu.userData,
+		-- Set by the callers that have them; FriendsFrame fills presenceID and
+		-- chatTarget for the Battle.net menus, chat frames fill chatTarget.
+		chatTarget = dropdownMenu.chatTarget,
+		presenceID = dropdownMenu.presenceID,
+	}
+end
+
 function CM:GetAvailableButtonTypes(contextData)
 	if not contextData.which or not self.TypeToFeatureMap[contextData.which] then
 		return
@@ -453,36 +424,148 @@ function CM:GetAvailableButtonTypes(contextData)
 	return availableButtonTypes
 end
 
-function CM:ModifyMenu(_, rootDescription, contextData)
-	if not self.db.enable then
+function CM:MenuHasSection(menu)
+	for index = 1, #menu do
+		if menu[index] == SECTION_TITLE_KEY then
+			return true
+		end
+	end
+
+	return false
+end
+
+--- Publishes the section into every unit popup this module supports.
+function CM:RegisterPopupButtons()
+	if not UnitPopupButtons or not UnitPopupMenus then
 		return
 	end
 
-	local which = contextData.which
-	if which == "BN_FRIEND" and not IsControlKeyDown() then
+	-- Mirrors FrameXML's makeUnitPopupSubsectionTitle so the client's own
+	-- UnitPopup_CheckAddSubsection draws the divider and heading for us.
+	UnitPopupButtons[SECTION_TITLE_KEY] = {
+		text = self.sectionName,
+		isTitle = true,
+		isUninteractable = true,
+		isSubsection = true,
+		isSubsectionTitle = true,
+		isSubsectionSeparator = true,
+	}
+
+	local featureOrder = {}
+	for feature, featureConfig in pairs(self.Features) do
+		featureOrder[#featureOrder + 1] = feature
+		-- UnitPopup_AddDropDownButton always routes the click to UnitPopup_OnClick,
+		-- so the feature is resolved from the button key there (see OnPopupClick).
+		UnitPopupButtons[featureButtonKey(feature)] = {
+			text = featureConfig.name,
+		}
+	end
+
+	sort(featureOrder, function(a, b)
+		return self.Features[a].order < self.Features[b].order
+	end)
+
+	for which in pairs(self.TypeToFeatureMap) do
+		local menu = UnitPopupMenus[which]
+		if menu and not self:MenuHasSection(menu) then
+			-- Keep the section above the trailing cancel entry.
+			local insertAt = #menu + 1
+			for index = #menu, 1, -1 do
+				local key = menu[index]
+				if key == "CANCEL" or key == "CLOSE" then
+					insertAt = index
+				else
+					break
+				end
+			end
+
+			tinsert(menu, insertAt, SECTION_TITLE_KEY)
+			for index = #featureOrder, 1, -1 do
+				tinsert(menu, insertAt + 1, featureButtonKey(featureOrder[index]))
+			end
+		end
+	end
+end
+
+--- Runs inside UnitPopup_HideButtons, i.e. after the client has decided the default
+--- visibility of every entry and before UnitPopup_ShowMenu lays the menu out, which
+--- is the only window in which the shown flags can still be overridden.
+function CM:HideButtons()
+	if not self.initialized then
 		return
 	end
 
-	local availableButtonTypes = self:GetAvailableButtonTypes(contextData)
-
-	if not availableButtonTypes or #availableButtonTypes == 0 then
+	local dropdownMenu = _G.UIDROPDOWNMENU_INIT_MENU
+	if not dropdownMenu then
 		return
 	end
 
-	rootDescription:CreateDivider()
-	if self.db.sectionTitle then
-		rootDescription:CreateTitle(self.sectionName)
+	-- Resolve the menu the same way UnitPopup_HideButtons does. The section only ever
+	-- lives in the top-level menus, so a nested "which" simply finds no WindTools keys
+	-- and nothing is written into that level's shown flags.
+	local which = _G.UIDROPDOWNMENU_MENU_VALUE or dropdownMenu.which
+	local menu = which and UnitPopupMenus[which]
+	local shown = UnitPopupShown and UnitPopupShown[_G.UIDROPDOWNMENU_MENU_LEVEL or 1]
+	if not menu or not shown then
+		return
 	end
 
-	for _, feature in ipairs(availableButtonTypes) do
-		local featureConfig = self.Features[feature]
-		rootDescription:CreateButton(featureConfig.name, featureConfig.func, contextData)
+	local availableMap = {}
+	for _, feature in ipairs(self:GetAvailableButtonTypes(self:BuildContextData(dropdownMenu)) or {}) do
+		availableMap[feature] = true
 	end
+
+	local anyAvailable = false
+	local sectionTitleIndex
+
+	for index, value in ipairs(menu) do
+		if value == SECTION_TITLE_KEY then
+			sectionTitleIndex = index
+		elseif type(value) == "string" and strsub(value, 1, #BUTTON_PREFIX) == BUTTON_PREFIX then
+			local enabled = self.db.enable and availableMap[featureFromButtonKey(value)] and true or false
+			shown[index] = enabled and 1 or 0
+			anyAvailable = anyAvailable or enabled
+		end
+	end
+
+	if sectionTitleIndex then
+		shown[sectionTitleIndex] = anyAvailable and 1 or 0
+	end
+end
+
+--- UnitPopup_OnClick(self) hands us the dropdown button; its .value is the key we
+--- registered in UnitPopupMenus, which is how the feature is recovered here.
+function CM:OnPopupClick(button)
+	local value = type(button) == "table" and button.value or button
+	local feature = type(value) == "string" and featureFromButtonKey(value)
+	local featureConfig = feature and self.Features[feature]
+	local dropdownMenu = _G.UIDROPDOWNMENU_INIT_MENU
+
+	if featureConfig and dropdownMenu then
+		featureConfig.func(self:BuildContextData(dropdownMenu))
+	end
+end
+
+function CM:InstallHooks()
+	if self.hooked or type(_G.UnitPopup_HideButtons) ~= "function" or type(_G.UnitPopup_OnClick) ~= "function" then
+		return
+	end
+
+	self:SecureHook("UnitPopup_HideButtons", function()
+		CM:HideButtons()
+	end)
+
+	self:SecureHook("UnitPopup_OnClick", function(button)
+		CM:OnPopupClick(button)
+	end)
+
+	self.hooked = true
 end
 
 function CM:Initialize()
 	self.db = E.db.WT.social.contextMenu
-	if not self.db.enable or self.initialized then
+
+	if not self.db.enable then
 		return
 	end
 
@@ -492,9 +575,8 @@ function CM:Initialize()
 	end
 	self.sectionName = F.GetWindStyleText(sectionText .. L["Menu"])
 
-	for supportType in pairs(self.TypeToFeatureMap) do
-		Menu_ModifyMenu("MENU_UNIT_" .. supportType, GenerateClosure(self.ModifyMenu, self))
-	end
+	self:InstallHooks()
+	self:RegisterPopupButtons()
 
 	self.initialized = true
 end

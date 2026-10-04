@@ -10,42 +10,29 @@ local select = select
 local strmatch = strmatch
 local tonumber = tonumber
 
-local ChatFrameUtil = _G.ChatFrameUtil
-local ChatFrameUtil_AddMessageEventFilter = ChatFrame_AddMessageEventFilter or function() end
+local AddMessageEventFilter = ChatFrame_AddMessageEventFilter or function() end
 local GetAchievementInfo = GetAchievementInfo
-local GetPvpTalentInfoByID = GetPvpTalentInfoByID
-local GetTalentInfoByID = GetTalentInfoByID
+local GetItemInfo = GetItemInfo
 local GetTalentInfo = GetTalentInfo
 
--- GetTalentInfoByID is not documented by this client, but addons (Details) call it
--- with the retail signature (talentID, name, texture, selected, available). The
--- classic signature (tabIndex, tier, column, rank) has no icon, so fall back to
--- GetTalentInfo(tab, tier, column) -> (name, icon, ...) when the third return is
--- not a texture.
-local function GetTalentTextureByID(talentID)
-	if not GetTalentInfoByID or not GetTalentInfo then
+-- Wrath talent hyperlinks carry the talent tree and the talent index inside it
+-- (GetTalentLink -> "|Htalent:tabIndex:talentIndex|h"), not a global talentID, and
+-- this client ships neither GetTalentInfoByID nor GetPvpTalentInfoByID.
+local function GetTalentTextureFromLink(link)
+	local tabIndex, talentIndex = strmatch(link, "Htalent:(%d+):(%d+)")
+	if not (tabIndex and talentIndex) then
 		return
 	end
 
-	local first, second, third = GetTalentInfoByID(talentID)
-	if not first then
-		return
-	end
-
-	if third and first ~= talentID then -- classic (tabIndex, tier, column, rank)
-		return select(2, GetTalentInfo(first, second, third))
-	end
-
-	return third -- retail (talentID, name, texture, ...)
+	-- GetTalentInfo(tabIndex, talentIndex) -> name, icon, tier, column, rank, ...
+	return select(2, GetTalentInfo(tonumber(tabIndex), tonumber(talentIndex)))
 end
 
--- PvP talents are retail-only; the helper stays inert when the API is absent.
-local function GetPvPTalentTextureByID(pvpTalentID)
-	if not GetPvpTalentInfoByID then
-		return
-	end
-
-	return select(3, GetPvpTalentInfoByID(pvpTalentID))
+-- The client exposes C_Item.GetItemName(itemLocation), not the retail
+-- C_Item.GetItemNameByID; GetItemInfo(itemID) returns the same client-localized
+-- name for an item ID.
+local function C_Item_GetItemNameByID(itemID)
+	return GetItemInfo(itemID)
 end
 
 local C_ChallengeMode_GetMapUIInfo = C_ChallengeMode and C_ChallengeMode.GetMapUIInfo
@@ -53,8 +40,6 @@ local C_CurrencyInfo_GetCurrencyInfo = C_CurrencyInfo and C_CurrencyInfo.GetCurr
 local C_Item_GetDetailedItemLevelInfo = W.Compatibility.GetDetailedItemLevelInfo
 local C_Item_GetItemIconByID = W.Compatibility.GetItemIconByID
 local C_Item_GetItemInfoInstant = W.Compatibility.GetItemInfoInstant
-local C_Item_GetItemNameByID = C_Item and C_Item.GetItemNameByID or function(itemID) return select(1, GetItemInfo(itemID)) end
-local C_Soulbinds_GetConduitCollectionData = C_Soulbinds and C_Soulbinds.GetConduitCollectionData or function() return nil end
 local C_Spell_GetSpellTexture = W.Compatibility.GetSpellTexture
 
 local RETRIEVING_ITEM_INFO = RETRIEVING_ITEM_INFO or "Retrieving item information"
@@ -211,39 +196,21 @@ local function AddItemInfo(link)
 end
 
 local function AddKeystoneIcon(link)
-	local itemID, mapID, level = strmatch(link, "Hkeystone:(%d-):(%d-):(%d-):")
-	if not (itemID and mapID and level and itemID == "180653") then
+	-- Sirus builds keystone hyperlinks in FrameXML/Utils/C_Item.lua as
+	--   |c<rarity>|Hkeystone:itemID:randomPropertyID:mapChallengeModeID:keystoneLevel:affix1..5|h[name]|h|r
+	-- The retail link put the map and the level in the second and third slots and
+	-- hardcoded the keystone itemID, so neither can be reused here.
+	local itemID, _, mapChallengeModeID = strmatch(link, "Hkeystone:(%d+):(%d+):(%d+):")
+	if not (itemID and mapChallengeModeID) then
 		return
 	end
 
-	if CL.db.icon then
-		local mapIDNum = tonumber(mapID)
-		local texture = mapIDNum and select(4, C_ChallengeMode_GetMapUIInfo(mapIDNum))
+	if CL.db.icon and C_ChallengeMode_GetMapUIInfo then
+		-- C_ChallengeMode.GetMapUIInfo -> name, id, criteria1, criteria2, criteria3, texture, backgroundTexture
+		local texture = select(6, C_ChallengeMode_GetMapUIInfo(tonumber(mapChallengeModeID)))
 		local icon = texture and F.GetIconString(texture, CL.db.iconHeight, CL.db.iconWidth, CL.db.keepRatio)
 		if icon then
 			link = icon .. " " .. link
-		end
-	end
-
-	return link
-end
-
-local function AddConduitIcon(link)
-	local conduitID = strmatch(link, "Hconduit:(%d-):")
-	if not conduitID then
-		return
-	end
-
-	if CL.db.icon then
-		local conduitCollectionData = C_Soulbinds_GetConduitCollectionData(conduitID)
-		local conduitItemID = conduitCollectionData and conduitCollectionData.conduitItemID
-
-		if conduitItemID then
-			local texture = C_Item_GetItemIconByID(conduitItemID)
-			local icon = texture and F.GetIconString(texture, CL.db.iconHeight, CL.db.iconWidth, CL.db.keepRatio)
-			if icon then
-				link = icon .. " " .. link
-			end
 		end
 	end
 
@@ -288,35 +255,15 @@ local function AddEnchantInfo(link)
 	return link
 end
 
-local function AddPvPTalentInfo(link)
-	-- PVP talent
-	local id = strmatch(link, "Hpvptal:(%d-)|")
-	if not id then
-		return
-	end
-
-	if CL.db.icon then
-		local pvpTalentIDNum = tonumber(id)
-		local texture = pvpTalentIDNum and GetPvPTalentTextureByID(pvpTalentIDNum)
-		local icon = texture and F.GetIconString(texture, CL.db.iconHeight, CL.db.iconWidth, CL.db.keepRatio)
-		if icon then
-			link = icon .. " " .. link
-		end
-	end
-
-	return link
-end
-
 local function AddTalentInfo(link)
 	-- talent
-	local id = strmatch(link, "Htalent:(%d-)|")
+	local id = strmatch(link, "Htalent:(%d+)")
 	if not id then
 		return
 	end
 
 	if CL.db.icon then
-		local talentIDNum = tonumber(id)
-		local texture = talentIDNum and GetTalentTextureByID(talentIDNum)
+		local texture = GetTalentTextureFromLink(link)
 		local icon = texture and F.GetIconString(texture, CL.db.iconHeight, CL.db.iconWidth, CL.db.keepRatio)
 		if icon then
 			link = icon .. " " .. link
@@ -369,14 +316,12 @@ end
 
 function CL:Filter(event, msg, ...)
 	if CL.db.enable and E:NotSecretValue(msg) then
-		msg = gsub(msg, "(|cff71d5ff|Hconduit:%d+:.-|h.-|h|r)", AddConduitIcon)
-		msg = gsub(msg, "(|cffa335ee|Hkeystone:%d+:.-|h.-|h|r)", AddKeystoneIcon)
+		msg = gsub(msg, "(|c%x+|Hkeystone:%d+:.-|h.-|h|r)", AddKeystoneIcon)
 		msg = gsub(msg, "(|Hitem:%d+:.-|h.-|h)", AddItemInfo)
 		msg = gsub(msg, "(|Hcurrency:%d+:.-|h.-|h)", AddCurrencyInfo)
 		msg = gsub(msg, "(|Hspell:%d+:%d+|h.-|h)", AddSpellInfo)
 		msg = gsub(msg, "(|Henchant:%d+|h.-|h)", AddEnchantInfo)
-		msg = gsub(msg, "(|Htalent:%d+|h.-|h)", AddTalentInfo)
-		msg = gsub(msg, "(|Hpvptal:%d+|h.-|h)", AddPvPTalentInfo)
+		msg = gsub(msg, "(|Htalent:%d+:%d+|h.-|h)", AddTalentInfo)
 		msg = gsub(msg, "(|Hachievement:%d+:.-|h.-|h)", AddAchievementInfo)
 	end
 	return false, msg, ...
@@ -409,7 +354,7 @@ function CL:Initialize()
 	}
 
 	for _, event in pairs(events) do
-		ChatFrameUtil_AddMessageEventFilter(event, self.Filter)
+		AddMessageEventFilter(event, self.Filter)
 	end
 
 	self.initialized = true

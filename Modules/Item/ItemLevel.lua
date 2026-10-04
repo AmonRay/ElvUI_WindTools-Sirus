@@ -95,12 +95,11 @@ function IL:FlyoutButton()
 			and type(button.location) == "number"
 			and not (button.location >= EQUIPMENTFLYOUT_FIRST_SPECIAL_LOCATION)
 		then
-			local locationData = EquipmentManager_GetLocationData(button.location)
-			if locationData.isBags then
-				itemLocation = ItemLocation:CreateFromBagAndSlot(locationData.bag, locationData.slot)
-			else
-				itemLocation = ItemLocation:CreateFromEquipmentSlot(locationData.slot)
-			end
+			-- EquipmentManager_GetLocationData is a Legion+ helper that this client
+			-- does not ship. Below EQUIPMENTFLYOUT_FIRST_SPECIAL_LOCATION the flyout
+			-- button location is already a plain inventory slot id, which is what
+			-- ItemLocation:CreateFromEquipmentSlot expects.
+			itemLocation = ItemLocation:CreateFromEquipmentSlot(button.location)
 		end
 
 		if itemLocation then

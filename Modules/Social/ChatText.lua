@@ -42,9 +42,12 @@ local Ambiguate = Ambiguate or function(name)
 	end
 	return (name:match("^([^%-]+)") or name)
 end
+-- This client has no C_ChatInfo namespace at all, so the retail channel helpers
+-- (GetChannelRuleset, GetChannelShortcutForChannelID, IsChannelRegionalForChannelID,
+-- IsChatLineCensored) cannot be shimmed and the code paths that used them are gone.
+-- ChatFrameUtil is likewise a retail SharedXML helper this client does not ship.
 local BNGetNumFriendInvites = BNGetNumFriendInvites
 local BNGetNumFriends = BNGetNumFriends
-local ChatFrameUtil = _G.ChatFrameUtil
 local ChatEditSetLastTellTarget = ChatEdit_SetLastTellTarget or function() end
 local FlashClientIcon = FlashClientIcon
 local GMChatFrame_IsGM = GMChatFrame_IsGM
@@ -52,15 +55,13 @@ local GetAchievementLink = GetAchievementLink
 local GetCVar = W.Compatibility.GetCVar
 local GetCVarBool = W.Compatibility.GetCVarBool
 local GetChannelName = GetChannelName
-local GetChannelRuleset = C_ChatInfo and C_ChatInfo.GetChannelRuleset or GetChannelRuleset
-local GetChannelShortcutForChannelID = C_ChatInfo and C_ChatInfo.GetChannelShortcutForChannelID or GetChannelShortcutForChannelID
 local GetChatCategory = _G.Chat_GetChatCategory
+local GetMessageEventFilters = _G.ChatFrame_GetMessageEventFilters
 local GetNumGroupMembers = GetNumGroupMembers
 local InCombatLockdown = InCombatLockdown
-local IsChannelRegionalForChannelID = C_ChatInfo and C_ChatInfo.IsChannelRegionalForChannelID or IsChannelRegionalForChannelID
-local IsChatLineCensored = C_ChatInfo and C_ChatInfo.IsChatLineCensored or IsChatLineCensored
 local IsInGroup = IsInGroup
 local IsInRaid = IsInRaid
+local NUM_CHAT_WINDOWS = NUM_CHAT_WINDOWS
 local PlaySoundFile = PlaySoundFile
 -- Sirus ElvUI 9.05 defines RemoveExtraSpaces as a colon method
 -- (function E:RemoveExtraSpaces(message)); calling the raw reference with
@@ -76,7 +77,9 @@ end
 local function RemoveNewlines(str)
 	return gsub(str, "\r\n", "")
 end
-local ResolvePrefixedChannelName = ChatFrameUtil and ChatFrameUtil.ResolvePrefixedChannelName or function(name)
+-- Retail resolved this through ChatFrameUtil.ResolvePrefixedChannelName, which
+-- this client does not ship.
+local function ResolvePrefixedChannelName(name)
 	if type(name) == "string" and name ~= "" then
 		return strmatch(name, "^%[%d+%.?%s*(.-)%]") or name
 	end
@@ -105,9 +108,9 @@ local function GetPlayerLink(characterName, linkDisplayText, lineID, chatType, c
 	return FormatLink("player", linkDisplayText, characterName)
 end
 
-local CHATCHANNELRULESET_MENTOR = _G.Enum and _G.Enum.ChatChannelRuleset and _G.Enum.ChatChannelRuleset.Mentor
-local chatFrameConstants = Constants and Constants.ChatFrameConstants
-local Constants_ChatFrameConstants_MaxChatWindows = chatFrameConstants and chatFrameConstants.MaxChatWindows or NUM_CHAT_WINDOWS or 7
+-- Chat windows are enumerated 1..NUM_CHAT_WINDOWS (the client defines 10 in
+-- FrameXML/ChatFrame.lua); the retail Constants.ChatFrameConstants.MaxChatWindows
+-- table does not exist.
 
 local PLAYER_REALM = E:ShortenRealm(E.myrealm)
 local PLAYER_NAME = format("%s-%s", E.myname, PLAYER_REALM)
@@ -490,16 +493,19 @@ do --this can save some main file locals
 
 	local portal = GetCVar('portal')
 	if portal == 'US' then
-		if E.Classic then
+		-- E.Classic / E.TBC / E.Mists / E.Retail are ElvUI flavour flags that this fork
+		-- does not define, so those distinctions never applied on 3.3.5a and are gone.
+		-- The entries below are keyed by retail-era player GUIDs
+		-- ("Player-<realmID>-<hex>"), a format a 3.3.5a client never emits, so they are
+		-- reachable only through the name-keyed specialChatIcons[playerName] lookup.
+		do
 			-- Simpy Seasonal (5813: Wild Growth)
 			z['Player-5813-0301DEC1']	= itsSimpy -- Warlock: Yubi
 			-- Simpy Era (5149: Mankrik)
 			z['Player-5149-04172B76']	= itsSimpy -- Warlock: Simpy
-		elseif E.TBC then
 			-- Simpy TBC Anniversary (6064: Dreamscythe)
 			z['Player-6064-02A886D5']	= itsSimpy -- Warlock: Simpy
 			z['Player-6064-0301DECC']	= itsSimpy -- Priest: Hunie
-		elseif E.Mists then
 			-- Simpy (4385: Pagle)
 			z['Player-4385-05E5F6DF']	= itsSimpy -- Shaman:	Kybi
 			z['Player-4385-05E5F60B']	= itsSimpy -- Druid:	Puttietat
@@ -508,7 +514,6 @@ do --this can save some main file locals
 			z['Player-4385-05E5F601']	= itsSimpy -- [Horde] Shaman:	Yube
 			-- Repooc
 			z['Repooc-Atiesh']			= itsPooc -- [Alliance] Paladin
-		elseif E.Retail then
 			-- Elv
 			z['Player-127-0AB2F946']	= itsElv -- Paladin
 			z['Player-5-0E83B943']		= itsElv -- Druid
@@ -663,7 +668,7 @@ do --this can save some main file locals
 			z['Bozaum-Spirestone']		= Beer
 		end
 	elseif portal == 'EU' then
-		if E.Classic then
+		do -- see the flavour note above
 			-- Luckyone Seasonal (5827: Living Flame EU)
 			z['Player-5827-0273D732']	= ElvGreen -- [Alliance] Hunter
 			z['Player-5827-0273D63E']	= ElvGreen -- [Alliance] Paladin
@@ -682,13 +687,11 @@ do --this can save some main file locals
 			-- Luckyone Classic Era (5233: Firemaw)
 			z['Player-5233-01D22A72']	= ElvGreen -- [Horde] Hunter: Unluckyone
 			z['Player-5233-01D27011']	= ElvGreen -- [Horde] Druid: Luckydruid
-		elseif E.TBC then
 			-- Luckyone Anniversary (6412: Spineshatter EU)
 			z['Player-6412-028A3A6D']	= ElvGreen -- [Horde] Hunter
 			z['Player-6412-0336641F']	= ElvGreen -- [Horde] Priest
 			z['Player-6412-02A39E0E']	= ElvGreen -- [Horde] Warlock
 			z['Player-6412-02BBE8AB']	= ElvGreen -- [Horde] Hunter 2
-		elseif E.Mists then
 			-- Luckyone (Horde: Garalon, Alliance: Shek'zeer)
 			z['Player-4454-060E2FD9']	= ElvGreen -- [Horde] Mage
 			z['Player-4454-060E336E']	= ElvGreen -- [Horde] Hunter
@@ -708,7 +711,6 @@ do --this can save some main file locals
 			z['Player-4454-060E3657']	= ElvGreen -- [Horde] Druid
 			z['Player-4454-060E364E']	= ElvGreen -- [Horde] Priest
 			z['Player-4454-060E361A']	= ElvGreen -- [Horde] Shaman
-		elseif E.Retail then
 			-- Blazeflack
 			z['Blazii-Silvermoon']		= ElvBlue -- Priest
 			z['Chazii-Silvermoon']		= ElvBlue -- Shaman
@@ -767,33 +769,6 @@ local function FlashTabIfNotShown(frame, info, chatType, chatGroup, chatTarget)
 	end
 end
 
-local function ChatFrame_CheckAddChannel(chatFrame, eventType, channelID)
-	-- This is called in the event that a user receives chat events for a channel that isn't enabled for any chat frames.
-	-- Minor hack, because chat channel filtering is backed by the client, but driven entirely from Lua.
-	-- This solves the issue of Guides abdicating their status, and then re-applying in the same game session, unless ChatFrame_AddChannel
-	-- is called, the channel filter will be off even though it's still enabled in the client, since abdication removes the chat channel and its config.
-	-- Only add to default (since multiple chat frames receive the event and we don't want to add to others)
-	if chatFrame ~= _G.DEFAULT_CHAT_FRAME then
-		return false
-	end
-
-	-- Only add if the user is joining a channel
-	if eventType ~= "YOU_CHANGED" then
-		return false
-	end
-
-	-- Only add regional channels (retail-only concept, absent on Wrath)
-	if not IsChannelRegionalForChannelID or not IsChannelRegionalForChannelID(channelID) then
-		return false
-	end
-
-	if chatFrame.AddChannel then
-		return chatFrame:AddChannel(GetChannelShortcutForChannelID(channelID)) ~= nil
-	else
-		return _G.ChatFrame_AddChannel(chatFrame, GetChannelShortcutForChannelID(channelID)) ~= nil
-	end
-end
-
 function CT:ChatFrame_MessageEventHandler(frame, event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, isHistory, historyTime, historyName, historyBTag)
 	-- ElvUI Chat History Note: isHistory, historyTime, historyName, and historyBTag are passed from CH:DisplayChatHistory() and need to be on the end to prevent issues in other addons that listen on ChatFrame_MessageEventHandler.
 	-- we also send isHistory and historyTime into CH:AddMessage so that we don't have to override the timestamp.
@@ -829,16 +804,11 @@ function CT:ChatFrame_MessageEventHandler(frame, event, arg1, arg2, arg3, arg4, 
 			return
 		end
 
-		local processFilters = ChatFrameUtil and ChatFrameUtil.ProcessMessageEventFilters
-		if processFilters then
-			local filtered, new1, new2, new3, new4, new5, new6, new7, new8, new9, new10, new11, new12, new13, new14, new15, new16, new17 = processFilters(frame, event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17)
-			if filtered then
-				return true
-			else
-				arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17 = new1, new2, new3, new4, new5, new6, new7, new8, new9, new10, new11, new12, new13, new14, new15, new16, new17
-			end
-		elseif _G.ChatFrame_GetMessageEventFilters then
-			local chatFilters = _G.ChatFrame_GetMessageEventFilters(event)
+		-- ChatFrameUtil.ProcessMessageEventFilters is a retail SharedXML helper this
+		-- client does not ship; ChatFrame_GetMessageEventFilters is the classic 3.3.5a
+		-- filter dispatch and the one ElvUI's own handler uses here.
+		if GetMessageEventFilters then
+			local chatFilters = GetMessageEventFilters(event)
 			if chatFilters then
 				for _, filterFunc in next, chatFilters do
 					local filtered, new1, new2, new3, new4, new5, new6, new7, new8, new9, new10, new11, new12, new13, new14, new15, new16, new17 = filterFunc(frame, event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17)
@@ -893,11 +863,10 @@ function CT:ChatFrame_MessageEventHandler(frame, event, arg1, arg2, arg3, arg4, 
 				end
 			end
 
+			-- Wrath has no regional/zone channels to re-add (the client adds every
+			-- channel it knows about itself), so an unknown channel is suppressed.
 			if not found or not info then
-				local eventType, channelID = arg1, arg7
-				if not ChatFrame_CheckAddChannel(self, eventType, channelID) then
-					return true
-				end
+				return true
 			end
 		end
 
@@ -998,19 +967,11 @@ function CT:ChatFrame_MessageEventHandler(frame, event, arg1, arg2, arg3, arg4, 
 		elseif chatType == 'CHANNEL_NOTICE' then
 			if E:IsSecretValue(arg1) then
 				return -- we cant get the globalstring because arg1 is secret
-			elseif E.Retail and arg1 == 'YOU_CHANGED' and (GetChannelRuleset(arg8) == CHATCHANNELRULESET_MENTOR) then
-				if frame.UpdateDefaultChatTarget then
-					frame:UpdateDefaultChatTarget()
-				else
-					_G.ChatFrame_UpdateDefaultChatTarget(frame)
-				end
-
-				frame.editBox:UpdateNewcomerEditBoxHint()
 			else
-				if E.Retail and arg1 == 'YOU_LEFT' then
-					frame.editBox:UpdateNewcomerEditBoxHint(arg8)
-				end
-
+				-- The Mentor / "YOU_CHANGED" channel ruleset and the newcomer edit box hint
+				-- are retail-only: Enum.ChatChannelRuleset, GetChannelRuleset,
+				-- ChatFrame_UpdateDefaultChatTarget and UpdateNewcomerEditBoxHint are all
+				-- absent on 3.3.5a.
 				local globalstring = _G['CHAT_'..arg1..'_NOTICE_TRIAL'] or _G['CHAT_'..arg1..'_NOTICE_BN'] or _G['CHAT_'..arg1..'_NOTICE']
 				if not globalstring then return end
 
@@ -1051,19 +1012,10 @@ function CT:ChatFrame_MessageEventHandler(frame, event, arg1, arg2, arg3, arg4, 
 				frame:AddMessage(_G.BN_INLINE_TOAST_BROADCAST_INFORM, info.r, info.g, info.b, info.id, nil, nil, nil, nil, nil, isHistory, historyTime)
 			end
 		else
-			-- The message formatter is captured so that the original message can be reformatted when a censored message
-			-- is approved to be shown. We only need to pack the event args if the line was censored, as the message transformation
-			-- step is the only code that needs these arguments. See ItemRef.lua "censoredmessage".
-			---@diagnostic disable-next-line: unbalanced-assignments
-			local isChatLineCensored, eventArgs, msgFormatter = IsChatLineCensored and IsChatLineCensored(arg11) -- arg11: lineID
-			if isChatLineCensored then
-				eventArgs = _G.SafePack(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17)
-
-				msgFormatter = function(msg) -- to translate the message on click [Show Message]
-					local body = CT:MessageFormatter(frame, info, chatType, chatGroup, chatTarget, channelLength, coloredName, historySavedName, msg, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, isHistory, historyTime, historyName, historyBTag)
-					return CH:AddMessageEdits(frame, body, isHistory, historyTime)
-				end
-			end
+			-- 3.3.5a has no chat line censorship (there is no C_ChatInfo.IsChatLineCensored),
+			-- so the message is always formatted in place and no event args / reformat
+			-- closure are handed to the frame. The frame still receives the two slots.
+			local eventArgs, msgFormatter
 
 			-- beep boops
 			local historyType = notChatHistory and not CH.SoundTimer and not strfind(event, '_INFORM') and historyTypes[event]
@@ -1077,7 +1029,7 @@ function CT:ChatFrame_MessageEventHandler(frame, event, arg1, arg2, arg3, arg4, 
 
 			local accessID = _G.ChatHistory_GetAccessID(chatGroup, chatTarget)
 			local typeID = _G.ChatHistory_GetAccessID(infoType, chatTarget, arg12 or arg13)
-			local body = isChatLineCensored and arg1 or CT:MessageFormatter(frame, info, chatType, chatGroup, chatTarget, channelLength, coloredName, historySavedName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, isHistory, historyTime, historyName, historyBTag)
+			local body = CT:MessageFormatter(frame, info, chatType, chatGroup, chatTarget, channelLength, coloredName, historySavedName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, isHistory, historyTime, historyName, historyBTag)
 
 			frame:AddMessage(body, info.r, info.g, info.b, info.id, accessID, typeID, event, eventArgs, msgFormatter, isHistory, historyTime)
 		end
@@ -1354,7 +1306,7 @@ function CT:ToggleReplacement()
 	end
 
 	if self.db.enable and self.db.trimEditBoxHeader and W.Locale == "zhCN" then
-		for i = 1, Constants_ChatFrameConstants_MaxChatWindows do
+		for i = 1, NUM_CHAT_WINDOWS do
 			local editBox = _G["ChatFrame" .. i .. "EditBox"]
 			if editBox and editBox.header then
 				local header = editBox.header
@@ -1724,7 +1676,7 @@ function CT:HandleBattleNetFriendStatus(accountName, accountID, characters)
 			local message = gsub(template, "%%players%%", players)
 			message = gsub(message, "%%bnet%%", bnetLink)
 
-			for i = 1, Constants_ChatFrameConstants_MaxChatWindows do
+			for i = 1, NUM_CHAT_WINDOWS do
 				local chatFrame = _G["ChatFrame" .. i]
 				if chatFrame and chatFrame:IsEventRegistered("CHAT_MSG_BN_INLINE_TOAST_ALERT") then
 					chatFrame:AddMessage(message, ...)

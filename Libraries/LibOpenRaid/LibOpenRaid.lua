@@ -68,11 +68,15 @@ local isExpansion_Dragonflight = function()
 	end
 end
 
--- WindTools may load on the modified Wrath client, but only the legacy-safe
--- subset is enabled there. Retail data collectors remain disabled by default.
+-- WindTools: LibOpenRaid is opt-in on the modified 3.3.5a client. Preflight.lua
+-- resolves the switch before Libraries\Load_Libraries.xml runs, so the whole
+-- library (this file and the files it guards with LIB_OPEN_RAID_CAN_LOAD) stays
+-- out of the way unless the client is modern enough or the user opted in.
+if not _G.WindTools_OpenRaidEnabled then
+    return
+end
+
 local isWindToolsWrath = WOW_PROJECT_ID == WOW_PROJECT_WRATH_CLASSIC or toc < 100000
--- The current WindTools profile does not enable OpenRaid on Wrath by default.
--- It is loaded only when explicitly opted in after client runtime verification.
 if isWindToolsWrath then
     return
 end

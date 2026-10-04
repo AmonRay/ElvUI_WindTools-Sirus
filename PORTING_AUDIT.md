@@ -248,3 +248,204 @@
 5. Проверить chat (ввод/ссылки), tooltip (итем/юнит), quest log, world map, minimap, merchant/bags.
 6. Combat lockdown: вход/выход из боя без taint-ошибок.
 7. Отключить WindTools — ElvUI работает как раньше.
+
+# Preflight-совместимость: отсутствующие legacy-глобалы (2026-09-20)
+
+## Метод
+
+Источник истины для «что реально есть на клиенте» — три независимых набора:
+
+1. `interface/addons/APIDocumentation/Documentation/*` — дамп C-API, зарегистрированного **этим** клиентом (12 435 имён).
+2. Lua-исходники клиента (`D:/!sirus_addons/patch-ruRU-i/DF/Interface/...`) — определяют Lua-глобалы (`Mixin`, `CreateColor`, `CreateFramePool`, `FormatLargeNumber`, `GenerateClosure`, `ItemLocation`, `Menu`, `AutoExtend`, `C_Timer.NewTimer`).
+3. `MRT/Compat335.lua` (рабочий 3.3.5a-аддон в этом же клиенте) — эталонный список отсутствующих глобалов.
+4. `ElvUI/` и `ElvUI_Libraries/` — что уже даёт форк (например, `GetClassInfo` там есть только как **файлово-локальная** функция, глобала нет).
+
+Автоматический аудит: все захваты `local X = X` (332 шт.) сверены с этими наборами. Итог — 15 подтверждённо отсутствующих глобалов, которые WindTools вызывает.
+
+## Ключевая находка: порядок загрузки
+
+`.toc`: `Preflight.lua` → `Libraries/` → `Initialize.lua` → … → `Core/`.
+
+Библиотеки грузятся **до** `Core/CompatibilityLayer.lua`, поэтому шимы из Core не видны для LibKeystone/LibOpenRaid. Весь слой шимов перенесён в `Preflight.lua` — он выполняется первым.
+
+Следствие: `LibKeystone` падал **при загрузке** (`local pName = UnitNameUnmodified("player")`, строка 239 — функция отсутствует), а его `securecallfunction`-диспетчер не работал даже если бы библиотека догрузилась.
+
+## Добавлено в `Preflight.lua` (все шимы guarded по `type(_G.X) ~= "function"` — на клиенте, где глобал есть, ничего не подменяется)
+
+| Глобал | Статус на клиенте | Реализация |
+|---|---|---|
+| `securecallfunction` | нет (нет в APIDoc и в Lua-исходниках) | `pcall` + `geterrorhandler` |
+| `UnitNameUnmodified` | нет | `UnitName` |
+| `UnitFullName` | нет | `UnitName` + `GetRealmName` |
+| `UnitHealthPercent` / `UnitPowerPercent` | нет | `UnitHealth/Max × 100` (вызывающие форматируют как процент; `CurveConstants` на клиенте нет) |
+| `UnitSpellHaste` | нет | rating bonus или 0 |
+| `UnitGetTotalAbsorbs` / `UnitGetTotalHealAbsorbs` | нет | `0` |
+| `UnitIsGroupAssistant` | нет (`UnitIsGroupLeader` есть в `C_Unit.lua`) | обход ростера по рангу |
+| `GetNumGroupMembers` / `IsInRaid` / `IsInGroup` / `GetNumSubgroupMembers` | нет | счётчики `GetNumPartyMembers`/`GetNumRaidMembers` |
+| `MuteSoundFile` / `UnmuteSoundFile` | нет | no-op (на 3.3.5a нет пофайлового мьюта) |
+| `GenerateFlatClosure` | нет (`GenerateClosure` есть в `SharedXML/FunctionUtil.lua`) | nils-safe замыкание |
+| `GetItemInfoFromHyperlink` | нет | разбор `item:(%d+)` из ссылки |
+| `QuestIsFromAreaTrigger` | нет | `false` |
+| `AcknowledgeAutoAcceptQuest` | нет | no-op (подтверждать нечего вне retail-попапа) |
+| `GetActiveQuestID` | нет (и `C_GossipInfo` на клиенте нет; `GetGossipActiveQuests` отдаёт только title/level/isTrivial/isComplete) | `nil` — вызывающий код уже проверяет результат; подставить «угаданный» id значило бы автовыбрать неверный квест |
+
+Плюс инфраструктурные шимы, которые на этом клиенте присутствуют в SharedXML и потому срабатывают как no-op, но страхуют иную сборку Sirus: `Mixin`/`CreateFromMixins`/`CreateAndInitFromMixin`, `ColorMixin`/`CreateColor`/`CreateColorFromBytes`/`WrapTextInColorCode`, `ObjectPoolMixin`/`CreateObjectPool`/`FramePoolMixin`/`CreateFramePool`/`TexturePoolMixin`/`CreateTexturePool`, `FormatLargeNumber`/`BreakUpLargeNumbers`, `wipe`/`table.wipe`, `CopyTable`, `strtrim`/`string.trim`, `strsplit` (с поддержкой `maxSplits`), `GetClassInfo`, `Ambiguate`, `DebugPrint` и ключи `SOUNDKIT`, которые играет WindTools.
+
+## Исправления в модулях (там, где шим не подходит — нужна своя логика)
+
+- **`Modules/Social/ContextMenu`** — блок «Report Stats» вызывал отсутствующие `GetHaste`/`GetMasteryEffect`/`GetVersatilityBonus`/`GetLifesteal` и отсутствующие строки `STAT_HASTE`/`STAT_MASTERY`/`STAT_VERSATILITY`/`STAT_LIFESTEAL` **безусловно** (падение при каждом использовании пункта меню). Переписано на реальные характеристики Wrath: крит, хаст (из `GetCombatRatingBonus(CR_HASTE_MELEE/RANGED/SPELL)`) и сила атаки (`UnitAttackPower`). Mastery/Versatility/Lifesteal на 3.3.5a не существуют и удалены.
+- **`Modules/Skins/Blizzard/PetBattle`** — скин безусловно индексировал `PetBattleFrame`/`ElvUIPetBattleActionBar` (боёв питомцев на 3.3.5a нет; скин вызывается через `nonAddonsToLoad`). Добавлен presence-guard по конвенции проекта.
+- **`Modules/Tooltips/Icons`** — удалены мёртвые захваты `UnitBattlePetSpeciesID`/`UnitBattlePetType`/`UnitIsBattlePet`/`UnitIsBattlePetCompanion`/`UnitIsWildBattlePet`/`PET_TYPE_SUFFIX`.
+- **`Modules/Misc/SkipCutScene`** — `CinematicFrame_CancelCinematic` отсутствует; заменено на `StopCinematic` (именно его вызывает escape-обработчик в клиентском `FrameXML/CinematicFrame.lua`).
+- **`Modules/Item/ItemLevel`** — `EquipmentManager_GetLocationData` (Legion+) отсутствует; ниже `EQUIPMENTFLYOUT_FIRST_SPECIAL_LOCATION` `button.location` уже является слотом инвентаря, поэтому используется `ItemLocation:CreateFromEquipmentSlot` (сам `ItemLocation` на клиенте есть — им пользуется `SharedXML/Utils/C_Item.lua`).
+- **`Modules/Tooltips/UnitInfo`** — `GetCreatureDifficultyColor` отсутствует; заменено на `GetQuestDifficultyColor` (так же делают ElvUI и Leatrix_Plus на этом клиенте).
+- **`Modules/Misc/Math`** — `E:BuildAbbreviateConfigs`/`CreateAbbreviateConfig` в форке отсутствуют, а `hooksecurefunc` по несуществующему методу — ошибка. Добавлен early-return: твик Kanji-сокращений неприменим без них.
+- **`Modules/Misc/ReshiiWrapsUpgrade`** — добавлен API-guard (`GenericTraitUI_LoadUI` + `CharacterBackSlot`), чтобы включение опции не приводило к вызову отсутствующей retail-функции.
+
+## Проверки
+
+- Все изменённые файлы: баланс скобок/ключевых слов нулевой (`function+if+do+repeat == end+until`).
+- Повторный аудит: из 332 захватов не осталось ни одного незащищённого вызова отсутствующего глобала. Остаток отчёта — либо уже зашимленные имена, либо guarded call-sites (`GetPvpTalentInfoByID`, `GetTalentInfoByID`, `GMChatFrame_IsGM`, `GetNumAutoQuestPopUps`), либо не-функции (`HP`, `UIErrorsFrame`), либо модули, отключённые capability-пробами (`Settings`/`SettingsPanel`, `WeeklyRewards_ShowUI`, `GenericTraitUI_LoadUI`).
+- Синхронизировано в игровую копию `ElvUI_WindTools` (md5 совпал для всех 10 файлов).
+
+## Дополнительно: цели `SecureHook`/`RawHook` по имени глобала
+
+Проверены все 63 строковые цели `SecureHook("Name")`/`RawHook("Name")`/`Hook("Name")` в Core/Modules/Options. Все отсутствующие на клиенте либо уже под guard'ом, либо недостижимы:
+
+- `FriendsFrame_UpdateFriendButton` — под `if _G.FriendsFrame_UpdateFriendButton then` в `Skins/Blizzard/Friends.lua` и `Social/FriendList.lua`.
+- `CinematicFrame_UpdateLettboxForAspectRatio`, `MovieFrame_PlayMovie` — под presence-guard'ами в `Skins/Blizzard/Misc.lua`.
+- `GroupFinderFrame_ShowGroupFrame`, `PVEFrame_ShowFrame` — в `Misc/LFGList.lua` после early-return (модуль невозможен без `C_MythicPlus.RequestCurrentAffixes`).
+- `TalkingHead_LoadUI` — `Misc/DisableTalkingHead.lua` теперь под presence-guard'ом (`TalkingHeadFrame` и `TalkingHead_LoadUI` на клиенте отсутствуют — talking heads появились в BfA).
+- `CinematicStarted` — `Misc/SkipCutScene.lua` теперь под presence-guard'ом; клиент вместо этого глобального вызывает `EventRegistry:TriggerEvent("CinematicFrame.CinematicStarting")`, и этот путь в модуле уже задействован.
+- Имена классов `*Mixin` (Auctionator) и `BottomTabButton`/`DropMenu`/`DropMenuItem`/`ListView`/`PageScrollBar` (MeetingStone) — ходят через `S:TryPostHook` (проверяет `_G[name]` и `_G[name][method]`) и `SkinViaRawHook` (через `LibStub("NetEaseGUI-2.0"):GetClass`), т.е. отсутствие аддона/класса — no-op, а не ошибка.
+
+Итог: незащищённых строковых hook-целей не осталось.
+
+# Social: retail-структуры данных → Wrath (2026-09-20; ChatText / ChatLink / ContextMenu)
+
+## ContextMenu — самая крупная находка
+
+- **Было:** `Menu.ModifyMenu("MENU_UNIT_" .. which, ...)` + `rootDescription:CreateDivider()/CreateTitle()/CreateButton()` + `GenerateClosure`.
+  Клиент **содержит** retail-фреймворк `Menu` (`FrameXML/Custom_Menu/Menu.lua`, `Menu.ModifyMenu` определён на строке 2583), но **unit popup к нему не подключён**: попап строится классическими таблицами `UnitPopupMenus` / `UnitPopupButtons` / `UnitPopupShown` (`FrameXML/UnitPopup.lua` → `UnitPopup_ShowMenu` → `UnitPopup_HideButtons` → `UnitPopup_OnClick`). `Menu.PopulateDescription` вызывается только из `Custom_Menu/DropdownButton.lua`, а тег `MENU_UNIT_*` не публикуется нигде (`grep -rn "MENU_UNIT" Interface` — 0 совпадений). Значит, коллбэк `Menu.ModifyMenu` не срабатывал никогда: весь модуль был мёртв (ни одной ошибки в логе, просто тишина).
+- **Стало:** кнопки регистрируются в `UnitPopupButtons`, секция (`WINDTOOLS_SECTION_TITLE` + `WINDTOOLS_<FEATURE>`) дописывается в `UnitPopupMenus[which]` перед хвостовым `CANCEL`/`CLOSE`. Заголовок повторяет `makeUnitPopupSubsectionTitle` клиента, чтобы разделитель и заголовок рисовал родной `UnitPopup_CheckAddSubsection`.
+- Видимость — `SecureHook("UnitPopup_HideButtons")` (единственное окно: клиент вызывает её до подсчёта видимых пунктов и до раскладки), клики — `SecureHook("UnitPopup_OnClick")` (`UnitPopup_AddDropDownButton` безусловно ставит `info.func = UnitPopup_OnClick`).
+- Меню резолвится ровно как в клиенте (`UnitPopupMenus[UIDROPDOWNMENU_MENU_VALUE] or UnitPopupMenus[dropdownMenu.which]`), чтобы вложенное подменю уровня 2 не портило свои `UnitPopupShown[2]`.
+- `contextData` (retail-таблица с `bnetIDAccount`, `communityClubID`, …) ⇒ `CM:BuildContextData(dropdownMenu)` из полей, которые заполняет классический попап: `which`, `unit`, `name`, `server`, `userData`, `chatTarget`, `presenceID` (последние два заполняют chat-фреймы и `FriendsFrame_ShowBNDropdown`).
+- **Battle.net:** `C_BattleNet.GetFriendAccountInfo / GetFriendGameAccountInfo / GetFriendNumGameAccounts` и структура `gameAccountInfo.clientProgram / wowProjectID / characterName / realmName` отсутствуют (`C_BattleNet` на клиенте нет нигде). Заменено на `BNGetFriendInfoByID(presenceID)` + `BNGetToonInfo(toonID)`; whisper по BN — `BNSendWhisper(presenceID, text)` (именно так его зовёт `FrameXML/ChatFrame.lua`).
+- `C_Club.GetGuildClubId` (communities) удалён; `C_GuildInfo.Invite` и `C_FriendList.SendWho` на клиенте отсутствуют → нативные `GuildInvite` / `SendWho`.
+- `supportTypes` урезаны до значений `which`, которые клиент реально публикует: нет `GUILD`, `GUILD_OFFLINE`, `ENEMY_PLAYER`, `WORLD_STATE_SCORE`, `COMMUNITIES_*`, `RAF_RECRUIT`.
+
+## ChatText
+
+| Было (retail) | Стало (3.3.5a) |
+| --- | --- |
+| `Constants.ChatFrameConstants.MaxChatWindows` | `NUM_CHAT_WINDOWS` (клиент задаёт 10 в `FrameXML/ChatFrame.lua`) |
+| `C_ChatInfo.GetChannelRuleset` + `Enum.ChatChannelRuleset.Mentor` + ветка «Mentor» по `E.Retail`, `ChatFrame_UpdateDefaultChatTarget`, `editBox:UpdateNewcomerEditBoxHint()` | удалено: `C_ChatInfo` на клиенте нет нигде, `Enum`/`Constants` не содержат этих таблиц |
+| `ChatFrame_CheckAddChannel` (на основе `IsChannelRegionalForChannelID` + `GetChannelShortcutForChannelID`) | удалено: зонных/региональных каналов на 3.3.5a нет, клиент сам добавляет все известные ему каналы; неизвестный канал просто подавляется — так же, как в `ElvUI/Core/Modules/Chat/Chat.lua` |
+| `ChatFrameUtil.ProcessMessageEventFilters` | `ChatFrame_GetMessageEventFilters` (классический dispatch, им же пользуется ElvUI) |
+| `ChatFrameUtil.ResolvePrefixedChannelName` | локальный порт той же логики |
+| `IsChatLineCensored` + `SafePack` + `msgFormatter` (цензура строки и её «одобрение») | удалено: на 3.3.5a цензуры строк нет, сообщение форматируется сразу |
+| `E.Classic` / `E.TBC` / `E.Mists` / `E.Retail` как гейты таблиц vendor-GUID | флаги в этом форке ElvUI не определены вообще, поэтому гейты убраны; таблицы остались, но их ключи — retail-GUID (`Player-<realmID>-<hex>`), которых 3.3.5a не выдаёт, так что достижим только путь `specialChatIcons[playerName]` |
+
+## ChatLink
+
+| Было (retail) | Стало (Sirus 3.3.5a) |
+| --- | --- |
+| `Hkeystone:(%d-):(%d-):(%d-)` + жёсткий `itemID == "180653"` + `select(4, GetMapUIInfo)` | Ссылка Sirus (`SharedXML/Utils/C_Item.lua` → `CreateKeystoneLink`) имеет вид `\|c<rarity>\|Hkeystone:itemID:randomPropertyID:mapChallengeModeID:keystoneLevel:affix1..5\|h[name]\|h\|r`, а `C_ChallengeMode.GetMapUIInfo` возвращает `name, id, criteria1..3, texture, backgroundTexture` → парсинг полей 1/3 и текстура из 6-го значения; жёсткий itemID убран, паттерн `gsub` расширен с `\|cffa335ee` до `\|c%x+` |
+| `GetTalentInfoByID` / `GetPvpTalentInfoByID` (обоих нет на клиенте) + эвристика «retail vs classic» | `Htalent:tabIndex:talentIndex` → `GetTalentInfo(tab, index)`, иконка — 2-й возврат |
+| `Hconduit:` + `C_Soulbinds.GetConduitCollectionData` | удалено: кондуиты — Shadowlands, `C_Soulbinds` и `Hconduit` на клиенте отсутствуют |
+| `Hpvptal:` + PvP-таланты | удалено: PvP-таланты в 3.3.5a не существуют |
+| `C_Item.GetItemNameByID` | `GetItemInfo(itemID)` (клиент отдаёт `C_Item.GetItemName(itemLocation)`, но не ByID) |
+
+## Проверки
+
+- Баланс `function+if+do+repeat == end+until` и скобок — нулевой во всех трёх файлах; переводы строк сохранены (CRLF, без одиночных LF/CR).
+- Оставшиеся упоминания retail-имён — только в комментариях-пояснениях и в имени локального хелпера `C_Item_GetItemNameByID` (`Modules/Social/ChatLink.lua`), который и есть заменяющая обёртка.
+- Синхронизировано в игровую копию `ElvUI_WindTools`.
+
+## LibOpenRaid: условная загрузка
+
+| Было | Стало |
+| --- | --- |
+| Решение о загрузке принималось в трёх местах по-разному. `Libraries\Load_Libraries.xml` жёстко включал `LibOpenRaid\lib.xml`; внутри `LibOpenRaid.lua` гейт `isWindToolsWrath = WOW_PROJECT_ID == WOW_PROJECT_WRATH_CLASSIC or toc < 100000` на этом клиенте истинен **по совпадению** (оба глобала `nil`, `nil == nil` → `true`), а `Initialize.lua` гейтил регистрацию `E.Libs.OpenRaid` третьей эвристикой (`HasLegacyQuestAPI and not HasModernSpellAPI and not HasModernMapAPI`). Включить библиотеку здесь было нельзя вообще, а её состояние нигде не показывалось. | `Preflight.lua` (загружается первым, до `Libraries`) один раз вычисляет `_G.WindTools_OpenRaidEnabled = интерфейсная версия >= 100000`. `LibOpenRaid.lua` первой же строкой выходит, если переключатель выключен, остальные файлы библиотеки уже гейтились её флагом `LIB_OPEN_RAID_CAN_LOAD` (то есть не выполняются вообще), а `Initialize.lua` регистрирует `E.Libs.OpenRaid` **только** если библиотека реально загрузилась. Переключатель — обычный глобал, поэтому библиотеку можно включить до загрузки аддона; состояние видно в отчёте Sirus Compat, раздел «Встроенные библиотеки». |
+
+## KeystoneInfo: нативный путь без LibOpenRaid
+
+Модуль был построен на LibOpenRaid (`OR.RequestKeystoneDataFromRaid()`, `OR.GetKeystoneInfo(unit)`), которого на этом клиенте нет: `OR` — `nil`, поэтому `RequestData()` падал на каждом `GROUP_ROSTER_UPDATE`, а `UnitData()` не мог отдать данные ни для кого. Теперь LibOpenRaid не используется: источник истины — собственная реализация эпохальных подземелий клиента (`FrameXML/Utils/C_Mythic.lua`).
+
+| Было (retail / LibOpenRaid) | Стало (Sirus 3.3.5a) |
+| --- | --- |
+| `OR.RequestKeystoneDataFromRaid()` / `FromParty()` + `OR.GetKeystoneInfo(unit)` | Ключ самого игрока — `C_MythicPlus.GetOwnerKeystoneInfo()` → `itemID, mapChallengeModeID, level, affixIDs`. Ключи остальных — LibKeystone (связка `LibKS`, та же что у BigWigs и Details). Если LibKeystone не загрузилась, модуль продолжает отдавать свой ключ и сообщает об этом в Sirus Compat |
+| `C_MythicPlus.GetOwnedKeystoneChallengeMapID` / `GetOwnedKeystoneLevel` + скан сумок | `GetOwnerKeystoneInfo()` (сразу mapID, уровень и аффиксы); `C_MythicPlus.GetOwnerKeystoneTime()` доступен для оставшегося времени ключа |
+| Поиск ключа в сумках через `C_Item.IsItemKeystoneByID(itemID)` и `select(4, strsplit(":", link))` | Клиент сам перестраивает ссылку ключа (`SharedXML/Utils/C_Item.lua` → `PRIVATE.CreateKeystoneLink`) и отдаёт её через `GetContainerItemLink`, поэтому владелец определяется по наличию `Hkeystone:` в ссылке, а mapID и уровень разбираются явным паттерном `Hkeystone:%d+:%d+:(%d+):(%d+)` (старый `select(4, …)` совпадал с форматом лишь случайно) |
+| Проверка `difficulty == 208` (Delve) в `RequestData()` | удалено: Delve'ов в 3.3.5a не существует |
+| `UnitData(unit)`: `OR.GetKeystoneInfo(unit)`, иначе LibKeystone | LibKeystone, иначе собственный ключ игрока из `C_MythicPlus` — тултип показывает свой ключ даже до ответа группы |
+| `W.MythicPlusMapData` (ключи — retail MapChallengeMode) | плюс ленивое слияние карт клиента в `W:GetMythicPlusMapData()`: `C_ChallengeMode.GetMapTable()` + `GetMapUIInfo()` → `name / abbr / tex / idString / timeLimit / timers`. Без этого серверные `challengeMapID` Sirus не находились в retail-таблице и тултип ключа показывал пусто |
+| Два одинаковых `if not KS then … return end` (со вторым `type(KS.Register)`) | один флаг `hasKeystoneExchange`; модуль не выключается целиком, а деградирует до собственного ключа и сообщает причину |
+
+Отдельно: `Libraries\LibKeystone\LibKeystone.lua` — `GetInfo()` безусловно вызывал `C_PlayerInfo.GetPlayerMythicPlusRatingSummary("player")`, которого на клиенте нет ни в каком виде (`grep` по всему `Interface` — 0 совпадений), то есть **любой** `KS.Request()` падал. Рейтинг теперь читается из собственного API клиента: `C_ChallengeMode.GetOverallDungeonScore()`, иначе `C_MythicPlus.GetSeasonBestMythicRating()`.
+
+## Проверки
+
+- Баланс `function+if+do+repeat == end+until` и всех видов скобок — нулевой во всех изменённых файлах.
+- Переводы строк — CRLF во всех файлах, включая новые `Modules/Compat/*` и `Options/SirusCompat.lua`.
+- Ключи локализации Sirus Compat и отчёта добавлены в `enUS` и `ruRU` (по 58 ключей).
+- Синхронизировано в игровую копию `ElvUI_WindTools`.
+- Без живого клиента не проверяется: разбор серверных `mapChallengeModeID` (нужен ключ в сумке), обмен `LibKS` с союзниками и раскрытие секции WindTools в контекстном меню юнита.
+
+
+# Краш клиента при сохранении переменных (2026-09-26)
+
+## Симптомы
+
+- Включение аддона — мгновенный ERROR #132 (ACCESS_VIOLATION) на выходе в мир/при выходе из игры.
+- Краш продолжается и после отключения аддона, пока WTF не восстановлен из бэкапа.
+- Дампы `Errors/*.txt`: `RtlSizeHeap+329` (порча кучи), `lua_State dump: <no Lua frames active>` — падает C-сериализатор сохраняемых переменных клиента 12340, а не Lua-код.
+
+## Причина
+
+У WindTools нет собственного `## SavedVariables`: все его данные пишутся внутрь `ElvDB` (`ElvUI.lua`), который клиент загружает и сохраняет всегда, даже когда аддон выключен. Одна структура, которую сериализатор 12340 не переваривает (циклическая таблица, запредельная глубина, `nan`/`inf`, сериализуемые как `1.#INF`/`1.#NAN`, не-сериализуемый ключ), портит файл — и клиент падает на каждом старте при разборе ElvUI.lua, пока файл не заменён вручную.
+
+## Мера
+
+`Core/DBSanitizer.lua` (подключён в `Core/Load_Core.xml` после `Update.lua`):
+
+- По `PLAYER_LOGOUT` (последний Lua-код перед сериализацией) обходит `ElvDB.WT`, `ElvDB.global.WT`, `ElvDB.profiles[*].WT`, `ElvPrivateDB.WT` + профили, `ElvCharacterDB.WT`.
+- Вырезает: обратные рёбра-циклы (детектор по стеку предков, а не по visited — ромбовидные общие ссылки не трогает), глубину > 64, не-числовые ключи/ключи-`nan`/`inf`, значения `nan`/`inf`, `function`/`userdata`.
+- Бюджет 100000 узлов против зависания; до 10 путей удалённого печатается в чат с причиной (`cycle`/`depth`/`number`/`key`/`value:...`) — при рецидиве путь сразу указывает на модуль-виновник.
+- Ручной запуск: `/run W.Utilities.DBSanitizer:SanitizeAll()`.
+
+## Ограничение
+
+Санитайзер защищает только таблицы WindTools. Если отравленной окажется чужая ветка ElvDB (сам ElvUI или другой плагин), краш останется — путь в дампе и точка срабатывания подскажут виновника.
+
+## Дополнение (2026-09-26, после живого теста)
+
+`Modules/Quest/AchievementTracker.lua`: `ThresholdSlider:SetObeyStepOnDrag(true)` ронял `Construct()` на клиенте — метод описан в APIDocumentation клиента (`SimpleSliderAPIDocumentation.lua`), но отсутствует в его фактической реализации Slider. Вызов защищён проверкой `if ThresholdSlider.SetObeyStepOnDrag then` ( cosmetics-only: влияет лишь на то, тянется ли ползунок к шагам при перетаскивании ). Урок: документация клиента перечисляет методы, которых нет в рантайме — править только по проверенной реализации из patch-источников.
+
+## Widget-шимы в Preflight (2026-09-26, вторая волна живых ошибок)
+
+Хронология: `SetObeyStepOnDrag` ронял `Construct()` после присвоения `self.MainFrame` (строка 827), повторный `Initialize` (через `Install.lua -> UpdateAll -> ProfileUpdate`) уходил по re-entry guard, регистрировал `AfterLogin -> UpdateView -> UpdateDropdowns` и падал на недостроенном фрейме. Два фикса:
+
+1. **Атомарный Construct** (`Modules/Quest/AchievementTracker.lua`): `self.MainFrame = MainFrame` перенесён в самый конец `Construct()` — упавший Construct больше не оставляет полуразобранного фрейма, повторный вызов честно перестраивает всё с нуля.
+2. **Widget-шимы** (`Preflight.lua`, секция между Debug helper и Optional libraries):
+   - `Texture:SetGradient` — адаптер: клиент реализовал числовую форму `(orientation, r1,g1,b1, r2,g2,b2)` (их `CompactUnitFrame.lua:1904`), WT передаёт retail ColorMixin'ы. Нативная реализация сохранена, ColorMixin-аргументы транслируются в неё; деградация в `SetGradientAlpha`/плоский цвет, если нативной нет. Убивает класс ошибок во всех модулях (AchievementTracker 1220, EventTracker 344/363, ObjectiveTracker 115, Skins).
+   - `Frame:SetClipsChildren`, `Frame:SetFading`, `Texture:SetRotation`, `Slider:SetObeyStepOnDrag` — no-op, только если метод реально отсутствует (probe через `getmetatable(CreateFrame(...)).__index`).
+
+Урок: клиент частично реализует retail-виджет API — undocumented-расхождения надо проверять probe'ом метатаблицы, а не только APIDocumentation.
+
+## LibKeystone: восстановление загрузки на клиенте (2026-09-26)
+
+Отчёт совместимости показал «LibKeystone не загрузилась». Причины в `Libraries/LibKeystone/LibKeystone.lua`:
+
+1. **Блокер загрузки**: `C_ChatInfo.RegisterAddonMessagePrefix or RegisterAddonMessagePrefix` давал `nil` (на 3.3.5a регистрациии префиксов не существует — это Cata+ API), `if not registerPrefix then return end` прерывал **весь файл**. Фикс: регистрация выполняется только если API есть; в классике все addon-сообщения доставляются без реестра префиксов.
+2. **GetInfo()**: вызывал `C_MythicPlus.GetOwnedKeystoneLevel()`/`GetOwnedKeystoneChallengeMapID()` — у клиента их нет. Добавлен нативный путь `C_MythicPlus.GetOwnerKeystoneInfo()` (FrameXML/Utils/C_Mythic.lua) → `keyLevel, keyChallengeMapID` (с учётом порядка возвратов `itemID, mapChallengeModeID, level, affixIDs`), retail-путь оставлен фолбэком с guard'ами.
+3. Остальные retail-глобалы (`UnitNameUnmodified`, `securecallfunction`, `Ambiguate`) уже закрыты шимами Preflight; `CHAT_MSG_ADDON`, `GUILD`/`PARTY` addon-каналы и `C_Timer.NewTimer` на клиенте есть.
+
+Проверено: баланс блоков OK, CRLF OK, синхронизировано. Не проверено без живого клиента: фактический обмен сообщениями LibKS между двумя игроками.
+
+## RaidMarkers: SetScaleFrom отсутствует в рантайме (2026-09-26)
+
+`APIDocumentation` клиента перечисляет `Scale:SetScaleFrom/SetScaleTo`, но в рантайме их нет — клиент сам пользуется классическим `scale1:SetScale(2, 2)` (Custom_PVPUI.lua:1836), то есть **множителем** относительно текущего масштаба на старте. В `Modules/Combat/RaidMarkers.lua` (OnEnter/OnLeave ховера-анимации) вызовы обёрнуты в guard: retail-путь сохранён, фолбэк — `SetScale(to, to)`; корректность обеспечивает OnPlay-скрипт группы, сбрасывающий масштаб текстуры в 1 перед проигрыванием (множитель = абсолютная цель). `CombatAlert` уже был на классическом `SetChange` — не тронут.
+
+Паттерн подтверждается второй раз: **документация клиента ≠ рантайм** — сверять каждый виджет-метод нужно с фактическим использованием в patch-источниках (grep по FrameXML/SharedXML), а не с APIDocumentation.

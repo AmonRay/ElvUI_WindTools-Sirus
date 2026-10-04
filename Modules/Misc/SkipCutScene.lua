@@ -7,7 +7,10 @@ local format = format
 local hooksecurefunc = hooksecurefunc
 local time = time
 
-local CinematicFrame_CancelCinematic = CinematicFrame_CancelCinematic
+-- CinematicFrame_CancelCinematic is not implemented by this client; the Wrath
+-- way to abort a cinematic (used by the escape-key handler in the client's own
+-- CinematicFrame.lua) is the StopCinematic global.
+local StopCinematic = StopCinematic
 local EventRegistry = _G.EventRegistry
 local IsModifierKeyDown = IsModifierKeyDown
 
@@ -40,7 +43,7 @@ local function trySkipCinematic(numTry)
 		return
 	end
 
-	CinematicFrame_CancelCinematic()
+	StopCinematic()
 	E:Delay(1, trySkipCinematic, numTry + 1)
 end
 
@@ -140,7 +143,11 @@ function M:SkipCutScene()
 	end
 
 	self:AddCutSceneReplayCustomLink()
-	self:SecureHook("CinematicStarted", "MovieCinematicStarted") -- Movie
+	-- CinematicStarted is a retail FrameXML global; this client only fires the
+	-- EventRegistry callbacks below, and SecureHook on a missing target errors.
+	if type(_G.CinematicStarted) == "function" then
+		self:SecureHook("CinematicStarted", "MovieCinematicStarted") -- Movie
+	end
 	if EventRegistry and EventRegistry.RegisterCallback then
 		EventRegistry:RegisterCallback("CinematicFrame.CinematicStarting", CinematicFrame_CinematicStarting_Callback) -- Cinematic
 		EventRegistry:RegisterCallback("Subtitles.OnMovieCinematicPlay", Subtitles_OnMovieCinematicPlay_Callback) -- Subtitles

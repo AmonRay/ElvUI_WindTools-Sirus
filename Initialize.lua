@@ -119,9 +119,9 @@ W.Compatibility.HasModernMapAPI = type(_G.C_Map) == "table"
 -- Pre-register libs into ElvUI
 E:AddLib("Deflate", "LibDeflate")
 E.Libs.Deflate.compressLevel = { level = 5 }
--- LibOpenRaid is retail-only until its Wrath data model is verified in the modified client.
--- Never call E:AddLib unless the library was actually loaded by the XML file.
-if not (type(W.Compatibility) == "table" and W.Compatibility.HasLegacyQuestAPI and not W.Compatibility.HasModernSpellAPI and not W.Compatibility.HasModernMapAPI) then
+-- LibOpenRaid is opt-in (resolved in Preflight.lua) and is not started when the
+-- switch is off, so never register it with LibStub/ElvUI unless it really loaded.
+if _G.WindTools_OpenRaidEnabled then
 	local openRaid = E.Libs.OpenRaid or (LibStub and LibStub("LibOpenRaid-1.0", true))
 	if openRaid then
 		E.Libs.OpenRaid = openRaid

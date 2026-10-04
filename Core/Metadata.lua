@@ -2,9 +2,11 @@ local W ---@class WindTools
 local F, E, L ---@type Functions, ElvUI, LocaleTable
 W, F, E, L = unpack((select(2, ...)))
 
+local ipairs = ipairs
 local pairs = pairs
 local tinsert = tinsert
 local tostring = tostring
+local type = type
 
 local GetCurrentRegionName = GetCurrentRegionName or function()
 	return "US"
@@ -22,6 +24,7 @@ local C_ChallengeMode = _G.C_ChallengeMode
 local C_CVar = _G.C_CVar
 local C_LootJournal = _G.C_LootJournal
 local C_ChallengeMode_GetMapUIInfo = C_ChallengeMode and C_ChallengeMode.GetMapUIInfo or function() return nil end
+local C_ChallengeMode_GetMapTable = C_ChallengeMode and C_ChallengeMode.GetMapTable
 local C_CVar_GetCVarBool = (C_CVar and C_CVar.GetCVarBool) or function(name) return GetCVar(name) == "1" end
 local C_LootJournal_GetItemSetItems = C_LootJournal and C_LootJournal.GetItemSetItems
 
@@ -55,7 +58,52 @@ W.MythicPlusMapData = {
 	[250] = { abbr = L["[ABBR] Temple of Sethraliss"], activityID = 139, timers = { 1152, 1536, 1920 } },
 }
 
+-- The modified client runs its own Mythic+ implementation (FrameXML/Utils/C_Mythic.lua)
+-- and numbers the dungeons with the challenge mode IDs the realm sends, which are
+-- not the retail MapChallengeMode IDs listed above. They are merged into the same
+-- table, so every consumer keeps one lookup: GetMapTable() lists the dungeons the
+-- realm runs, and GetMapUIInfo() returns
+-- (name, id, criteriaCount1..3, texture, backgroundTexture), where the criteria
+-- counts are that dungeon's time limits. The server pushes the table after login,
+-- so the merge happens on every read instead of once at load.
+---@return boolean merged
+local function MergeNativeMythicPlusMaps()
+	if type(C_ChallengeMode_GetMapTable) ~= "function" or type(C_ChallengeMode_GetMapUIInfo) ~= "function" then
+		return false
+	end
+
+	local merged = false
+	for _, challengeMapID in ipairs(C_ChallengeMode_GetMapTable()) do
+		if type(challengeMapID) == "number" and not W.MythicPlusMapData[challengeMapID] then
+			local name, _, first, second, third, texture = C_ChallengeMode_GetMapUIInfo(challengeMapID)
+
+			if name then
+				local timers
+				for _, timeLimit in ipairs({ first, second, third }) do
+					if type(timeLimit) == "number" and timeLimit > 0 then
+						timers = timers or {}
+						timers[#timers + 1] = timeLimit
+					end
+				end
+
+				W.MythicPlusMapData[challengeMapID] = {
+					abbr = name,
+					name = name,
+					tex = texture,
+					idString = tostring(challengeMapID),
+					timeLimit = first,
+					timers = timers,
+				}
+				merged = true
+			end
+		end
+	end
+
+	return merged
+end
+
 function W:GetMythicPlusMapData()
+	MergeNativeMythicPlusMaps()
 	return W.MythicPlusMapData
 end
 

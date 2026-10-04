@@ -26,10 +26,9 @@ local tostring = tostring
 local tremove = tremove
 local unpack = unpack
 
-local CreateDataProvider = CreateDataProvider
+local AddTrackedAchievement = AddTrackedAchievement
 local CreateFrame = CreateFrame
 local CreateFramePool = CreateFramePool
-local CreateScrollBoxListLinearView = CreateScrollBoxListLinearView
 local GameTooltip = _G.GameTooltip
 local GetAchievementCriteriaInfo = GetAchievementCriteriaInfo
 local GetAchievementInfo = GetAchievementInfo
@@ -38,23 +37,22 @@ local GetCategoryInfo = GetCategoryInfo
 local GetCategoryList = GetCategoryList
 local GetCategoryNumAchievements = GetCategoryNumAchievements
 local GetKeysArray = GetKeysArray
+local GetNumTrackedAchievements = GetNumTrackedAchievements
+local GetTrackedAchievements = GetTrackedAchievements
+local MAX_TRACKED_ACHIEVEMENTS = MAX_TRACKED_ACHIEVEMENTS
 local PlaySound = PlaySound
+local RemoveTrackedAchievement = RemoveTrackedAchievement
+local ToggleDropDownMenu = _G.ToggleDropDownMenu
+local UIDropDownMenu_AddButton = _G.UIDropDownMenu_AddButton
+local UIDropDownMenu_CreateInfo = _G.UIDropDownMenu_CreateInfo
+local UIDropDownMenu_Initialize = _G.UIDropDownMenu_Initialize
+local UIDropDownMenu_SetAnchor = _G.UIDropDownMenu_SetAnchor
 
 local C_AchievementInfo_GetRewardItemID = C_AchievementInfo and C_AchievementInfo.GetRewardItemID or function() return nil end
 local C_AchievementInfo_IsGuildAchievement = C_AchievementInfo and C_AchievementInfo.IsGuildAchievement or function() return false end
 local C_AchievementInfo_IsValidAchievement = C_AchievementInfo and C_AchievementInfo.IsValidAchievement or function() return false end
-local C_ContentTracking_GetTrackedIDs = C_ContentTracking and C_ContentTracking.GetTrackedIDs or function() return {} end
-local C_ContentTracking_IsTracking = C_ContentTracking and C_ContentTracking.IsTracking or function() return false end
-local C_ContentTracking_StartTracking = C_ContentTracking and C_ContentTracking.StartTracking or function() end
-local C_ContentTracking_StopTracking = C_ContentTracking and C_ContentTracking.StopTracking or function() end
-
-local Constants_ContentTrackingConsts = Constants.ContentTrackingConsts
-local Enum_ContentTrackingStopType = _G.Enum and _G.Enum.ContentTrackingStopType or {}
-local Enum_ContentTrackingType = _G.Enum and _G.Enum.ContentTrackingType or {}
 local RED_FONT_COLOR = RED_FONT_COLOR
 local SOUNDKIT = SOUNDKIT
-local ScrollBoxConstants = ScrollBoxConstants
-local ScrollUtil = ScrollUtil
 
 local LEFT_BUTTON_ICON = "|TInterface\\TUTORIALFRAME\\UI-TUTORIAL-FRAME:13:11:0:-1:512:512:12:66:230:307|t"
 local RIGHT_BUTTON_ICON = "|TInterface\\TUTORIALFRAME\\UI-TUTORIAL-FRAME:13:11:0:-1:512:512:12:66:333:410|t"
@@ -164,6 +162,50 @@ local function GetCriteriaData(achievementID)
 	end
 
 	return { percent = (completed / total) * 100, total = total, details = details, completed = completed }
+end
+
+---Whether the given achievement is currently tracked by the objective tracker
+---@param achievementID number
+---@return boolean
+local function IsAchievementTracked(achievementID)
+	local tracked = { GetTrackedAchievements() }
+	for _, id in ipairs(tracked) do
+		if id == achievementID then
+			return true
+		end
+	end
+	return false
+end
+
+---Get the number of achievements the player is currently tracking
+---@return number
+local function GetTrackedCount()
+	return GetNumTrackedAchievements() or 0
+end
+
+---Start tracking an achievement, returning true on success and false if the
+---tracker is already at the maximum (in which case the caller shows the error)
+---@param achievementID number
+---@return boolean
+local function StartTrackingAchievement(achievementID)
+	if IsAchievementTracked(achievementID) then
+		return true
+	end
+	if GetTrackedCount() >= MAX_TRACKED_ACHIEVEMENTS then
+		return false
+	end
+	AddTrackedAchievement(achievementID)
+	PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+	return true
+end
+
+---Stop tracking an achievement if it is currently tracked
+---@param achievementID number
+local function StopTrackingAchievement(achievementID)
+	if IsAchievementTracked(achievementID) then
+		RemoveTrackedAchievement(achievementID)
+		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_OFF)
+	end
 end
 
 local function processNextFrame(self)
@@ -357,14 +399,11 @@ function AT:UpdateView()
 		self.LastElement.isLastElement = true
 	end
 
-	local dataProvider = CreateDataProvider()
-	dataProvider:InsertTable(results)
-	self
-		.MainFrame
-		.ScrollFrame
-		.ScrollBox--[[@as ScrollBoxListMixin]]
-		:SetDataProvider(dataProvider)
-	self.MainFrame:UpdateDropdowns()
+	-- Cache the visible, filtered & sorted results and (re)lay them out in the
+	-- native Wrath scroll frame.
+	self.states.filteredResults = results
+	self:UpdateDropdowns()
+	self:RefreshScroll()
 end
 
 ---Update criteria data for an achievement
@@ -382,7 +421,8 @@ end
 ---Apply achievement data to a UI element
 ---@param frame Frame
 ---@param data AchievementData
-function AT:ScrollElementInitializer(frame, data, scrollBox)
+---@param scrollFrame Frame|ScrollFrame the native scroll frame the element lives in
+function AT:ScrollElementInitializer(frame, data, scrollFrame)
 	self:UpdateCriteriaData(data)
 
 	frame.data = data
@@ -591,36 +631,22 @@ function AT:ScrollElementInitializer(frame, data, scrollBox)
 				f.DetailFrame:SetShown(f.data.isExpanded)
 				f:UpdateHeight()
 
-				scrollBox:FullUpdate(ScrollBoxConstants.UpdateImmediately)
+				self:RefreshScroll()
 				if f.data.isLastElement then
-					scrollBox:ScrollToEnd()
+					self:ScrollToBottom(scrollFrame)
 				end
 			elseif button == "MiddleButton" then
-				if not C_ContentTracking_IsTracking(Enum_ContentTrackingType.Achievement, f.data.id) then
-					local trackedCount = #C_ContentTracking_GetTrackedIDs(Enum_ContentTrackingType.Achievement)
-					if trackedCount >= Constants_ContentTrackingConsts.MaxTrackedAchievements then
+				if not IsAchievementTracked(f.data.id) then
+					if not StartTrackingAchievement(f.data.id) then
 						_G.UIErrorsFrame:AddMessage(
-							format(
-								L["Cannot track more than %d achievements"],
-								Constants_ContentTrackingConsts.MaxTrackedAchievements
-							),
+							format(L["Cannot track more than %d achievements"], MAX_TRACKED_ACHIEVEMENTS),
 							RED_FONT_COLOR:GetRGBA()
 						)
 						return
 					end
-
-					local err = C_ContentTracking_StartTracking(Enum_ContentTrackingType.Achievement, f.data.id)
-					if not err then
-						PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-						IndicatorFrame.TrackingText:SetShown(true)
-					end
+					IndicatorFrame.TrackingText:SetShown(true)
 				else
-					C_ContentTracking_StopTracking(
-						Enum_ContentTrackingType.Achievement,
-						f.data.id,
-						Enum_ContentTrackingStopType.Manual
-					)
-					PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_OFF)
+					StopTrackingAchievement(f.data.id)
 					IndicatorFrame.TrackingText:SetShown(false)
 				end
 			elseif button == "RightButton" then
@@ -690,9 +716,7 @@ function AT:ScrollElementInitializer(frame, data, scrollBox)
 	local color = GetCachedProgressColor(data.criteriaData.percent, self.states.cache.progressColors)
 	frame.ProgressBackdrop:SetStatusBarColor(color.r, color.g, color.b)
 	frame.ProgressBackdrop:SetValue(data.criteriaData.percent)
-	frame.IndicatorFrame.TrackingText:SetShown(
-		C_ContentTracking_IsTracking(Enum_ContentTrackingType.Achievement, data.id)
-	)
+	frame.IndicatorFrame.TrackingText:SetShown(IsAchievementTracked(data.id))
 	frame.IndicatorFrame.RewardsIcon:Hide()
 	frame.IndicatorFrame.RewardsIcon.backdrop:Hide()
 	if data.reward.itemID then
@@ -739,6 +763,56 @@ function AT:ScrollElementResetter(frame)
 	frame.DetailFrame:Hide()
 end
 
+---Relay dropdown updates to the main frame
+function AT:UpdateDropdowns()
+	if self.MainFrame then
+		self.MainFrame:UpdateDropdowns()
+	end
+end
+
+---Display text for the current category filter
+---@param categoryID number|nil
+---@return string
+function AT:GetCategoryDropdownText(categoryID)
+	return categoryID and GetCategoryInfo(categoryID) or (L["All Categories"] or "All Categories")
+end
+
+---Display text for the current sort mode
+---@return string
+function AT:GetSortDropdownText()
+	local by = self.states.sort.by
+	if by == "name" then
+		return L["Name"]
+	elseif by == "category" then
+		return L["Category"]
+	end
+	return L["Percentage"]
+end
+
+---Rebuild the native scroll view from the filtered, sorted results
+function AT:RefreshScroll()
+	local scrollFrame = self.MainFrame and self.MainFrame.ScrollFrame
+	if not scrollFrame or not self.MainFrame:IsShown() then
+		return
+	end
+	if scrollFrame.LayoutScroll then
+		scrollFrame:LayoutScroll()
+	end
+end
+
+---Scroll the native view to the bottom
+---@param scrollFrame Frame|ScrollFrame
+function AT:ScrollToBottom(scrollFrame)
+	if not scrollFrame then
+		return
+	end
+	local range = scrollFrame:GetVerticalScrollRange()
+	scrollFrame:SetVerticalScroll(range)
+	if scrollFrame.ScrollBar then
+		scrollFrame.ScrollBar:SetValue(range)
+	end
+end
+
 function AT:Construct()
 	if self.MainFrame then
 		return
@@ -750,7 +824,6 @@ function AT:Construct()
 	MainFrame:SetTemplate("Transparent")
 	MainFrame:SetShown(self.db.enabled and self.db.show)
 	S:CreateShadow(MainFrame)
-	self.MainFrame = MainFrame
 	MainFrame.States = self.states
 
 	local SearchBox = CreateFrame("EditBox", "WTAchievementTrackerSearchBox", MainFrame, "SearchBoxTemplate")
@@ -786,7 +859,11 @@ function AT:Construct()
 	ThresholdSlider:Size(140, 16)
 	ThresholdSlider:Point("LEFT", ControlFrame1, "LEFT", 11, -8)
 	ThresholdSlider:SetOrientation("HORIZONTAL")
-	ThresholdSlider:SetObeyStepOnDrag(true)
+	-- Sirus 3.3.5a: documented in APIDocumentation but absent from the client's
+	-- Slider widget implementation -- guard instead of failing Construct.
+	if ThresholdSlider.SetObeyStepOnDrag then
+		ThresholdSlider:SetObeyStepOnDrag(true)
+	end
 	ThresholdSlider:SetMinMaxValues(0, 100)
 	ThresholdSlider:SetValueStep(1)
 	ThresholdSlider:SetValue(self.db.threshold)
@@ -863,70 +940,107 @@ function AT:Construct()
 	ControlFrame2:SetTemplate("Transparent")
 	MainFrame.ControlFrame2 = ControlFrame2
 
-	local CategoryDropdown = CreateFrame("DropdownButton", nil, ControlFrame2, "WowStyle1DropdownTemplate")
-	CategoryDropdown:Point("LEFT", ControlFrame2, "LEFT", 8, 0)
-	S:Proxy("HandleDropDownBox", CategoryDropdown, 150)
-	CategoryDropdown:SetupMenu(function(_, rootDescription)
-		---@cast rootDescription RootMenuDescriptionProxy
-		rootDescription:CreateRadio(L["All Categories"] or "All Categories", function()
-			return self.states.filters.categoryID == nil
-		end, function()
-			self.states.filters.categoryID = nil
-			self:UpdateView()
-		end)
+	local CategorySelectButton = CreateFrame("Button", nil, ControlFrame2, "UIPanelButtonTemplate")
+	CategorySelectButton:Size(150, 25)
+	CategorySelectButton:Point("LEFT", ControlFrame2, "LEFT", 8, 0)
+	S:Proxy("HandleButton", CategorySelectButton)
+	CategorySelectButton.Text = CategorySelectButton:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	CategorySelectButton.Text:Point("CENTER", CategorySelectButton, "CENTER", -6, 0)
+	CategorySelectButton.Text:SetJustifyH("CENTER")
+	F.SetFont(CategorySelectButton.Text, E.db.general.font, 12)
+	CategorySelectButton.Arrow = CategorySelectButton:CreateTexture(nil, "OVERLAY")
+	CategorySelectButton.Arrow:SetTexture(W.Media.Textures.arrowDown)
+	CategorySelectButton.Arrow:Size(12)
+	CategorySelectButton.Arrow:Point("RIGHT", CategorySelectButton, "RIGHT", -5, 0)
+	CategorySelectButton.Arrow:SetVertexColor(1, 1, 1)
+	ControlFrame2.CategorySelectButton = CategorySelectButton
 
-		rootDescription:CreateDivider()
+	local CategoryDropdown = CreateFrame("Frame", "WTAchievementTrackerCategoryMenu", ControlFrame2, "UIDropDownMenuTemplate")
+	UIDropDownMenu_Initialize(CategoryDropdown, function(dropdown, level, menuList)
+		level = level or 1
+		local info = UIDropDownMenu_CreateInfo()
 
-		local categories = GetCategoryList()
-		local categoryTable = {} ---@type table<number, { id: number, name: string, subCategories: { id: number, name: string }[] }>
-		for _, categoryID in ipairs(categories) do
-			local title, parentCategoryID = GetCategoryInfo(categoryID)
-			if parentCategoryID and parentCategoryID > 0 then
-				if categoryTable[parentCategoryID] == nil then
-					categoryTable[parentCategoryID] = {
-						id = parentCategoryID,
-						name = GetCategoryInfo(parentCategoryID),
-						subCategories = {},
+		if level == 1 then
+			info.text = L["All Categories"] or "All Categories"
+			info.func = function()
+				self.states.filters.categoryID = nil
+				self:UpdateView()
+			end
+			info.checked = self.states.filters.categoryID == nil
+			info.isNotRadio = true
+			UIDropDownMenu_AddButton(info, level)
+
+			local categories = GetCategoryList()
+			local categoryTable = {} ---@type table<number, { id: number, name: string, subCategories: { id: number, name: string }[] }>
+			for _, categoryID in ipairs(categories) do
+				local title, parentCategoryID = GetCategoryInfo(categoryID)
+				if parentCategoryID and parentCategoryID > 0 then
+					if categoryTable[parentCategoryID] == nil then
+						categoryTable[parentCategoryID] = {
+							id = parentCategoryID,
+							name = GetCategoryInfo(parentCategoryID),
+							subCategories = {},
+						}
+					end
+
+					categoryTable[parentCategoryID].subCategories[
+						#categoryTable[parentCategoryID].subCategories + 1
+					] = {
+						id = categoryID,
+						name = title,
 					}
 				end
-
-				categoryTable[parentCategoryID].subCategories[#categoryTable[parentCategoryID].subCategories + 1] = {
-					id = categoryID,
-					name = title,
-				}
 			end
-		end
 
-		for _, category in pairs(categoryTable) do
-			sort(category.subCategories, function(a, b)
-				return a.name < b.name
-			end)
-		end
-
-		local sortedKeys = GetKeysArray(categoryTable)
-		sort(sortedKeys, function(a, b)
-			return categoryTable[a].id < categoryTable[b].id
-		end)
-
-		for _, parentCategoryID in ipairs(sortedKeys) do
-			local category = categoryTable[parentCategoryID]
-			local parent = rootDescription:CreateTitle(category.name)
-			for _, subCategory in ipairs(category.subCategories) do
-				parent:CreateRadio(subCategory.name, function()
-					return self.states.filters.categoryID == subCategory.id
-				end, function()
-					self.states.filters.categoryID = subCategory.id
-					self:UpdateView()
+			for _, category in pairs(categoryTable) do
+				sort(category.subCategories, function(a, b)
+					return a.name < b.name
 				end)
 			end
-		end
-	end)
 
+			local sortedKeys = GetKeysArray(categoryTable)
+			sort(sortedKeys, function(a, b)
+				return categoryTable[a].id < categoryTable[b].id
+			end)
+
+			for _, parentCategoryID in ipairs(sortedKeys) do
+				local category = categoryTable[parentCategoryID]
+				info.text = category.name
+				info.hasArrow = #category.subCategories > 0
+				info.notCheckable = false
+				info.value, info.arg1 = parentCategoryID, parentCategoryID
+				info.menuList = category.subCategories
+				info.func = nil
+				info.checked = nil
+				UIDropDownMenu_AddButton(info, level)
+			end
+		else
+			-- level 2: menuList holds the subCategories table of the selected parent
+			for _, subCategory in ipairs(menuList or {}) do
+				info.text = subCategory.name
+				info.func = function()
+					self.states.filters.categoryID = subCategory.id
+					self:UpdateView()
+				end
+				info.checked = self.states.filters.categoryID == subCategory.id
+				info.isNotRadio = true
+				info.hasArrow = false
+				info.menuList = nil
+				UIDropDownMenu_AddButton(info, level)
+			end
+		end
+	end, "MENU")
+	CategorySelectButton:SetScript("OnClick", function()
+		UIDropDownMenu_SetAnchor(CategoryDropdown, 0, 0, "TOPLEFT", CategorySelectButton, "BOTTOMLEFT")
+		-- refresh button text before opening
+		CategorySelectButton.Text:SetText(self:GetCategoryDropdownText(self.states.filters.categoryID))
+		ToggleDropDownMenu(1, nil, CategoryDropdown)
+	end)
 	ControlFrame2.CategoryDropdown = CategoryDropdown
 
 	local RewardsCheckButton = CreateFrame("CheckButton", nil, ControlFrame2, "UICheckButtonTemplate")
 	RewardsCheckButton:Size(22)
-	RewardsCheckButton:Point("LEFT", CategoryDropdown, "RIGHT", 15, 0)
+	RewardsCheckButton:Point("LEFT", CategorySelectButton, "RIGHT", 12, 0)
 	RewardsCheckButton.Text:SetText(L["Rewards"])
 	RewardsCheckButton.Text:SetTextColor(1, 1, 1)
 	F.SetFont(RewardsCheckButton.Text)
@@ -958,68 +1072,136 @@ function AT:Construct()
 	SortOrderButton:UpdateArrow()
 	ControlFrame2.SortOrderButton = SortOrderButton
 
-	local SortDropdown = CreateFrame("DropdownButton", nil, ControlFrame2, "WowStyle1DropdownTemplate")
-	SortDropdown:Point("RIGHT", SortOrderButton, "LEFT", -8, 0)
+	local SortSelectButton = CreateFrame("Button", nil, ControlFrame2, "UIPanelButtonTemplate")
+	SortSelectButton:Size(110, 22)
+	SortSelectButton:Point("RIGHT", SortOrderButton, "LEFT", -8, 0)
+	S:Proxy("HandleButton", SortSelectButton)
+	SortSelectButton.Text = SortSelectButton:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	SortSelectButton.Text:Point("CENTER", SortSelectButton, "CENTER", -6, 0)
+	SortSelectButton.Text:SetJustifyH("CENTER")
+	F.SetFont(SortSelectButton.Text, E.db.general.font, 12)
+	SortSelectButton.Arrow = SortSelectButton:CreateTexture(nil, "OVERLAY")
+	SortSelectButton.Arrow:SetTexture(W.Media.Textures.arrowDown)
+	SortSelectButton.Arrow:Size(12)
+	SortSelectButton.Arrow:Point("RIGHT", SortSelectButton, "RIGHT", -5, 0)
+	SortSelectButton.Arrow:SetVertexColor(1, 1, 1)
+	ControlFrame2.SortSelectButton = SortSelectButton
+
 	local sortOptions = {
 		{ text = L["Percentage"], value = "percent" },
 		{ text = L["Name"], value = "name" },
 		{ text = L["Category"], value = "category" },
 	}
-	local sortTexts = {}
-	for _, option in ipairs(sortOptions) do
-		sortTexts[#sortTexts + 1] = option.text
-	end
-	local dropdownWidth = 40 + max(40, F.GetAdaptiveTextWidth(E.media.normFont, 12, "OUTLINE", sortTexts))
-	S:Proxy("HandleDropDownBox", SortDropdown, dropdownWidth)
-	SortDropdown:SetupMenu(function(_, rootDescription)
+	local SortDropdown = CreateFrame("Frame", "WTAchievementTrackerSortMenu", ControlFrame2, "UIDropDownMenuTemplate")
+	UIDropDownMenu_Initialize(SortDropdown, function(dropdown, level)
+		level = level or 1
 		for _, option in ipairs(sortOptions) do
-			rootDescription:CreateRadio(option.text, function()
-				return self.states.sort.by == option.value
-			end, function()
+			local info = UIDropDownMenu_CreateInfo()
+			info.text = option.text
+			info.func = function()
 				self.states.sort.by = option.value
 				self:UpdateView()
-			end, option.value)
+			end
+			info.checked = self.states.sort.by == option.value
+			info.isNotRadio = true
+			info.hasArrow = false
+			UIDropDownMenu_AddButton(info, level)
 		end
+	end, "MENU")
+	SortSelectButton:SetScript("OnClick", function()
+		UIDropDownMenu_SetAnchor(SortDropdown, 0, 0, "TOPRIGHT", SortSelectButton, "BOTTOMRIGHT")
+		SortSelectButton.Text:SetText(self:GetSortDropdownText())
+		ToggleDropDownMenu(1, nil, SortDropdown)
 	end)
+	ControlFrame2.SortDropdown = SortDropdown
 
-	local ScrollFrame = CreateFrame("Frame", nil, MainFrame)
+	-- Native Wrath scroll view (no retail ScrollBox/DataProvider API exists on 3.3.5a).
+	-- Uses a plain ScrollFrame with a scroll child; every result gets one element
+	-- frame so variable (expanded) heights are laid out correctly.
+	local ScrollFrame = CreateFrame("ScrollFrame", nil, MainFrame)
 	ScrollFrame:Point("TOPLEFT", ControlFrame2, "BOTTOMLEFT", 0, -8)
 	ScrollFrame:Point("TOPRIGHT", ControlFrame2, "BOTTOMRIGHT", 0, -8)
 	ScrollFrame:Point("BOTTOM", MainFrame, "BOTTOM", 0, 8)
 	ScrollFrame:SetClipsChildren(true)
+	ScrollFrame:SetFading(true)
 	MainFrame.ScrollFrame = ScrollFrame
 
-	local ScrollBar = CreateFrame("EventFrame", nil, ScrollFrame, "MinimalScrollBar")
-	ScrollBar:Point("TOPRIGHT", ScrollFrame, "TOPRIGHT", -5, 0)
-	ScrollBar:Point("BOTTOMRIGHT", ScrollFrame, "BOTTOMRIGHT", -5, 0)
-	S:Proxy("HandleTrimScrollBar", ScrollBar)
+	local ScrollContent = CreateFrame("Frame", nil, ScrollFrame)
+	ScrollFrame:SetScrollChild(ScrollContent)
+	MainFrame.ScrollContent = ScrollContent
+
+	-- Native Wrath Slider scrollbar (the retail MinimalScrollBar/VirtualScrollBar is not
+	-- part of the 3.3.5a framework, so we use the classic UIPanel scrollbar template).
+	local ScrollBar = CreateFrame("Slider", nil, ScrollFrame, "UIPanelScrollBarTemplate")
+	ScrollBar:Point("TOPRIGHT", ScrollFrame, "TOPRIGHT", -5, 2)
+	ScrollBar:Point("BOTTOMRIGHT", ScrollFrame, "BOTTOMRIGHT", -5, -2)
+	S:Proxy("HandleScrollBar", ScrollBar)
 	ScrollFrame.ScrollBar = ScrollBar
 
-	local ScrollBox = CreateFrame("Frame", nil, ScrollFrame, "WowScrollBoxList")
-	ScrollBox:Point("TOPLEFT", ScrollFrame, "TOPLEFT", 0, 0)
-	ScrollBox:Point("BOTTOMRIGHT", ScrollBar, "BOTTOMLEFT", -8, 0)
-	ScrollBox:SetTemplate("Transparent")
-	ScrollBox:SetClipsChildren(true)
-	ScrollFrame.ScrollBox = ScrollBox
+	-- Element pool (one frame per visible row, reused across refreshes)
+	local ScrollElements = {}
+	ScrollFrame.elements = ScrollElements
+	ScrollFrame.ScrollContent = ScrollContent
 
-	local ScrollView = CreateScrollBoxListLinearView() --[[@as ScrollBoxLinearBaseViewMixin]]
+	local function LayoutScroll()
+		local results = self.states.filteredResults or {}
+		local contentHeight = 0
 
-	local DataProvider = CreateDataProvider()
-	DataProvider:InsertTable({})
+		for i = 1, #results do
+			local data = results[i]
+			local element = ScrollElements[i]
+			if not element then
+				element = CreateFrame("Frame", nil, ScrollContent)
+				element:SetTemplate("Transparent")
+				ScrollElements[i] = element
+			end
 
-	ScrollView:SetPadding(8, 8, 8, 8, 8)
-	ScrollView:SetElementInitializer("BackdropTemplate", function(frame, data)
-		self:ScrollElementInitializer(frame, data, ScrollBox)
+			element:ClearAllPoints()
+			element:Point("TOPLEFT", ScrollContent, "TOPLEFT", 2, -contentHeight)
+			element:Point("TOPRIGHT", ScrollContent, "TOPRIGHT", -10, -contentHeight)
+			data.height = data.height or (ELEMENT_ICON_SIZE + 2 * ELEMENT_PADDING)
+			self:ScrollElementInitializer(element, data, ScrollFrame)
+			element:Show()
+			contentHeight = contentHeight + (data.height or (ELEMENT_ICON_SIZE + 2 * ELEMENT_PADDING)) + ELEMENT_PADDING
+		end
+
+		for i = #results + 1, #ScrollElements do
+			ScrollElements[i]:Hide()
+		end
+
+		ScrollContent:Width(ScrollFrame:GetWidth())
+		ScrollContent:Height(contentHeight)
+		ScrollFrame:UpdateScrollChildRect()
+
+		local range = ScrollFrame:GetVerticalScrollRange()
+		if range > 0 then
+			ScrollBar:Show()
+			ScrollBar:SetMinMaxValues(0, range)
+		else
+			ScrollBar:Hide()
+		end
+		ScrollFrame.ScrollBar = ScrollBar
+	end
+
+	-- Mouse wheel + scrollbar driving
+	ScrollFrame:SetScript("OnMouseWheel", function(_, delta)
+		local val = ScrollFrame:GetVerticalScroll() + delta * -25
+		ScrollFrame:SetVerticalScroll(val)
 	end)
-	ScrollView:SetElementExtentCalculator(function(_, elementData)
-		return elementData.height or (ELEMENT_ICON_SIZE + 2 * ELEMENT_PADDING)
+	ScrollFrame:SetScript("OnVerticalScroll", function(_, offset)
+		ScrollBar:SetValue(offset)
 	end)
-	ScrollView:SetElementResetter(function(frame)
-		self:ScrollElementResetter(frame)
+	ScrollFrame:SetScript("OnSizeChanged", function()
+		if self.MainFrame and self.MainFrame:IsVisible() then
+			self:RefreshScroll()
+		end
 	end)
-	ScrollUtil.InitScrollBoxListWithScrollBar(ScrollBox, ScrollBar, ScrollView)
-	ScrollBox--[[@as ScrollBoxListMixin]]:SetDataProvider(DataProvider)
-	ScrollFrame.ScrollView = ScrollView
+	ScrollBar:SetScript("OnValueChanged", function(_, value)
+		ScrollFrame:SetVerticalScroll(value)
+	end)
+
+	ScrollFrame.LayoutScroll = LayoutScroll
+	MainFrame.UpdatingDropdowns = false
 
 	local ProgressFrame = CreateFrame("Frame", nil, MainFrame)
 	ProgressFrame:SetFrameStrata("DIALOG")
@@ -1069,8 +1251,8 @@ function AT:Construct()
 	end)
 
 	MainFrame.UpdateDropdowns = function()
-		SortDropdown:GenerateMenu()
-		CategoryDropdown:GenerateMenu()
+		CategorySelectButton.Text:SetText(self:GetCategoryDropdownText(self.states.filters.categoryID))
+		SortSelectButton.Text:SetText(self:GetSortDropdownText())
 	end
 
 	MainFrame:SetScript("OnShow", function()
@@ -1095,6 +1277,13 @@ function AT:Construct()
 
 	MainFrame.ProgressFrame:Hide()
 	MainFrame.CriteriaLinePool = CreateFramePool("Frame", nil)
+
+	-- Publish the frame only after the whole tree is built: a failed Construct
+	-- must never leave a half-built MainFrame behind, or the re-entry guard in
+	-- Initialize would skip re-constructing it and later calls would hit
+	-- missing sub-frame methods (observed as 'attempt to call method
+	-- UpdateDropdowns').
+	self.MainFrame = MainFrame
 end
 
 ---Handle ACHIEVEMENT_EARNED event
@@ -1119,13 +1308,15 @@ end
 function AT:CRITERIA_UPDATE()
 	F.Throttle(0.5, "AchievementTrackerCriteriaUpdate", function()
 		if self.MainFrame and self.MainFrame:IsVisible() then
-			self
-				.MainFrame
-				.ScrollFrame
-				.ScrollBox--[[@as ScrollBoxBaseMixin]]
-				:FullUpdate(ScrollBoxConstants.UpdateImmediately)
+			self:RefreshScroll()
 		end
 	end)
+end
+
+function AT:TRACKED_ACHIEVEMENT_UPDATE()
+	if self.MainFrame and self.MainFrame:IsVisible() then
+		self:RefreshScroll()
+	end
 end
 
 ---@param _ any
@@ -1162,21 +1353,8 @@ function AT:UpdatePosition()
 	return true
 end
 
-local function AT_RetailDropdownAvailable()
-	-- The retail DropdownButton frame type + menu API is absent on 3.3.5a; the whole
-	-- tracker control panel is built from retail widgets, so skip it gracefully.
-	local ok = pcall(function()
-		return CreateFrame("DropdownButton")
-	end)
-	return ok
-end
-
 function AT:Initialize()
 	if not E.db or not E.db.WT or not E.db.WT.quest.achievementTracker then
-		return
-	end
-
-	if not AT_RetailDropdownAvailable() then
 		return
 	end
 
@@ -1203,6 +1381,7 @@ function AT:Initialize()
 
 		self:RegisterEvent("ACHIEVEMENT_EARNED")
 		self:RegisterEvent("CRITERIA_UPDATE")
+		self:RegisterEvent("TRACKED_ACHIEVEMENT_UPDATE")
 	end
 
 	self:Enable()

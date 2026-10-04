@@ -94,6 +94,13 @@ W.options = {
 		icon = W.Media.Icons.information,
 		args = {},
 	},
+	sirusCompat = {
+		order = 113,
+		name = L["Sirus Compat"],
+		desc = L["Shows which WindTools modules and features are disabled on this client, and why."],
+		icon = W.Media.Icons.convert,
+		args = {},
+	},
 }
 
 local r1, g1, b1 = C.HexToRGB("f0772f")

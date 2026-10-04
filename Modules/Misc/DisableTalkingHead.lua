@@ -17,8 +17,16 @@ end
 function M:DisableTalkingHead()
 	if _G.TalkingHeadFrame then
 		self:HookTalkingHeadPlayCurrent()
-	else
+		return
+	end
+
+	-- Talking heads are a BfA-era feature: this client has neither
+	-- TalkingHeadFrame nor TalkingHead_LoadUI, and SecureHook on a missing
+	-- global target is an error, so the feature stays a no-op there.
+	if type(_G.TalkingHead_LoadUI) == "function" then
 		self:SecureHook("TalkingHead_LoadUI", "HookTalkingHeadPlayCurrent")
+	else
+		W.Compatibility:Report("TalkingHead", L["This client has no talking head frame, so there is nothing to hide."])
 	end
 end
 
