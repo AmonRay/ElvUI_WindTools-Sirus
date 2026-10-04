@@ -106,7 +106,9 @@ function KI:CheckPlayerKeystone(skipEmit)
 			self:SendMessage("WINDTOOLS_PLAYER_KEYSTONE_CHANGED", mapID, level, link)
 		end
 
-		KS.Request("GUILD")
+		if KS and KS.Request then
+			KS.Request("GUILD")
+		end
 	end
 
 	self.PlayerKeystone.mapID, self.PlayerKeystone.level = mapID, level
@@ -123,17 +125,17 @@ function KI.RequestData()
 		return
 	end
 
-	if not OR.RequestKeystoneDataFromRaid() then
-		if IsInGroup(LE_PARTY_CATEGORY_HOME) then
+	-- LibOpenRaid (Details!) is not loaded on 3.3.5a/Sirus, so it is optional;
+	-- LibKeystone is the data source there.
+	local requestedFromRaid = OR and OR.RequestKeystoneDataFromRaid and OR.RequestKeystoneDataFromRaid()
+	if not requestedFromRaid then
+		if KS and KS.Request and IsInGroup(LE_PARTY_CATEGORY_HOME) then
 			KS.Request("PARTY")
 		end
-		OR.RequestKeystoneDataFromParty()
+		if OR and OR.RequestKeystoneDataFromParty then
+			OR.RequestKeystoneDataFromParty()
+		end
 	end
-end
-
-if not KS then
-	function KI:OnEnable() end
-	return
 end
 
 if not KS or type(KS.Register) ~= "function" then
@@ -174,5 +176,7 @@ KI:RegisterEvent("CHALLENGE_MODE_RESET", "RequestData")
 KI:RegisterEvent("CHALLENGE_MODE_COMPLETED", "RequestAndCheckPlayerKeystone")
 KI:RegisterEvent("ITEM_CHANGED", "DelayedCheckPlayerKeystone")
 KI:RegisterEvent("ITEM_PUSH", "DelayedCheckPlayerKeystone")
+-- Sirus: server-pushed keystone info (FrameXML/Utils/C_Mythic.lua, custom event)
+KI:RegisterEvent("MYTHIC_PLUS_OWNED_KEYSTONE_UPDATE", "DelayedCheckPlayerKeystone")
 
 F.TaskManager:AfterLogin(KI.RequestAndCheckPlayerKeystone, KI, true)
