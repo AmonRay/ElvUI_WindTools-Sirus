@@ -6,6 +6,8 @@ local LibDeflate = E.Libs.Deflate
 
 local format = format
 local next = next
+local strfind = strfind
+local strsub = strsub
 local type = type
 
 ---@cast F Functions
@@ -78,9 +80,19 @@ end
 ---Import profile and private data from string
 ---@param importString string The import string containing profile and private data
 function F.Profiles.ImportByString(importString)
-	local profileString, privateString = E:SplitString(importString, "{}")
+	-- E:SplitString is retail ElvUI only; split on the "{}" separator written by
+	-- F.Profiles.GetOutputString with a plain find (works on ElvUI-Sirus too).
+	local profileString, privateString
+	if type(importString) == "string" then
+		local startPos, endPos = strfind(importString, "{}", 1, true)
+		if startPos then
+			profileString = strsub(importString, 1, startPos - 1)
+			privateString = strsub(importString, endPos + 1)
+		end
+	end
 	if not profileString or not privateString then
 		F.Print("Error importing profile. String is invalid or corrupted!")
+		return
 	end
 
 	local profileData = F.Profiles.ExactString(profileString)
