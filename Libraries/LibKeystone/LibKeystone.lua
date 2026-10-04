@@ -53,6 +53,13 @@ do
 	-- Normal APIs
 	local GetOwnedKeystoneLevel, GetOwnedKeystoneChallengeMapID = C_MythicPlus and C_MythicPlus.GetOwnedKeystoneLevel, C_MythicPlus and C_MythicPlus.GetOwnedKeystoneChallengeMapID
 	local GetPlayerMythicPlusRatingSummary = C_PlayerInfo and C_PlayerInfo.GetPlayerMythicPlusRatingSummary
+	-- Sirus (3.3.5a) ships its own Mythic+ system in FrameXML/Utils/C_Mythic.lua:
+	-- C_MythicPlus.GetOwnedKeystoneLevel/ChallengeMapID read the server-pushed
+	-- keystone info (nil until the server sends it) and the overall score is
+	-- C_ChallengeMode.GetOverallDungeonScore() -> dungeonScore, numRuns.
+	-- There is no C_PlayerInfo.GetPlayerMythicPlusRatingSummary on that client.
+	local GetOverallDungeonScore = C_ChallengeMode and C_ChallengeMode.GetOverallDungeonScore
+	local floor = math.floor
 
 	-- Timerunning APIs
 	local GetContainerNumSlots, GetContainerItemID, GetContainerItemLink = C_Container and C_Container.GetContainerNumSlots, C_Container and C_Container.GetContainerItemID, C_Container and C_Container.GetContainerItemLink
@@ -60,13 +67,13 @@ do
 	local strsplit = string.split
 	function GetInfo()
 		-- Keystone level
-		local keyLevel = GetOwnedKeystoneLevel()
+		local keyLevel = GetOwnedKeystoneLevel and GetOwnedKeystoneLevel()
 		if type(keyLevel) ~= "number" then
 			keyLevel = 0
 		end
 		-- Keystone challenge ID [https://wago.tools/db2/MapChallengeMode]
 		-- You can pass this ID into `C_ChallengeMode.GetMapUIInfo()` to get info like the name
-		local keyChallengeMapID = GetOwnedKeystoneChallengeMapID()
+		local keyChallengeMapID = GetOwnedKeystoneChallengeMapID and GetOwnedKeystoneChallengeMapID()
 		if type(keyChallengeMapID) ~= "number" then
 			keyChallengeMapID = 0
 		end
@@ -94,25 +101,66 @@ do
 		end
 
 		-- M+ rating
-		local playerRatingSummary = GetPlayerMythicPlusRatingSummary("player")
 		local playerRating = 0
-		if type(playerRatingSummary) == "table" and type(playerRatingSummary.currentSeasonScore) == "number" then
-			playerRating = playerRatingSummary.currentSeasonScore
+		if GetPlayerMythicPlusRatingSummary then
+			local playerRatingSummary = GetPlayerMythicPlusRatingSummary("player")
+			if type(playerRatingSummary) == "table" and type(playerRatingSummary.currentSeasonScore) == "number" then
+				playerRating = playerRatingSummary.currentSeasonScore
+			end
+		elseif GetOverallDungeonScore then
+			local dungeonScore = GetOverallDungeonScore()
+			if type(dungeonScore) == "number" then
+				playerRating = dungeonScore
+			end
 		end
-		return keyLevel, keyChallengeMapID, playerRating
+		return floor(keyLevel), floor(keyChallengeMapID), floor(playerRating)
 	end
 end
 
 local SendAddonMessage = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
-local CTimerNewTimer
-if C_Timer and type(C_Timer.NewTimer) == "function" then
-	local NewTimer = C_Timer.NewTimer
-	CTimerNewTimer = function(delay, callback, ...)
-		return NewTimer(C_Timer, delay, callback, ...)
+-- C_Timer.NewTimer is a plain function (dot call) on retail and on Sirus
+-- (SharedXML/C_TimerAugment.lua: `function C_Timer.NewTimer(duration, callback)`).
+-- Passing C_Timer as the first argument shifts duration/callback and breaks the
+-- Sirus timer queue. Stock 3.3.5a has no C_Timer, so keep a tiny frame fallback.
+local CTimerNewTimer = C_Timer and C_Timer.NewTimer
+if type(CTimerNewTimer) ~= "function" then
+	local timerFrame = CreateFrame("Frame")
+	local pending = {}
+	local function Cancel(timer)
+		timer.cancelled = true
+	end
+	timerFrame:Hide()
+	local due = {}
+	timerFrame:SetScript("OnUpdate", function(self, elapsed)
+		for timer in next, pending do
+			timer.remaining = timer.remaining - elapsed
+			if timer.cancelled then
+				pending[timer] = nil
+			elseif timer.remaining <= 0 then
+				pending[timer] = nil
+				due[#due + 1] = timer
+			end
+		end
+		for i = 1, #due do
+			local timer = due[i]
+			due[i] = nil
+			timer.callback(timer)
+		end
+		if not next(pending) then
+			self:Hide()
+		end
+	end)
+	CTimerNewTimer = function(delay, callback)
+		local timer = { remaining = delay, callback = callback, Cancel = Cancel }
+		pending[timer] = true
+		timerFrame:Show()
+		return timer
 	end
 end
 local GetTime = GetTime
-local next, securecallfunction = next, securecallfunction
+local next = next
+-- securecallfunction is retail-only; securecall is the 3.3.5a equivalent.
+local securecallfunction = securecallfunction or securecall
 local throttleTime = 3 -- Seconds
 do
 	local throttleTable = {
@@ -131,7 +179,10 @@ do
 	end
 
 	do
-		local IsInGroup, IsInGuild = IsInGroup, IsInGuild
+		local IsInGuild = IsInGuild
+		local IsInGroup = IsInGroup or function()
+			return (GetNumRaidMembers and GetNumRaidMembers() > 0) or (GetNumPartyMembers and GetNumPartyMembers() > 0)
+		end
 		local function SendToParty()
 			if timerTable.PARTY then
 				timerTable.PARTY:Cancel()
@@ -217,6 +268,8 @@ do
 			self:UnregisterEvent("ITEM_CHANGED")
 			self:UnregisterEvent("ITEM_PUSH")
 			self:UnregisterEvent(event)
+		elseif event == "MYTHIC_PLUS_OWNED_KEYSTONE_UPDATE" then -- Sirus pushes keystone changes from the server
+			CTimerNewTimer(1, DidKeystoneChange)
 		elseif event == "ITEM_CHANGED" or (event == "ITEM_PUSH" and msg == 4352494) then -- We automatically broadcast newly received keystones, but only at the end of a Mythic+
 			-- Check if the player got a new keystone from the NPC (ITEM_CHANGED) or the chest (ITEM_PUSH)
 			CTimerNewTimer(1, DidKeystoneChange) -- There can sometimes be delay with the API updating, especially on PTR, so wait 1 second before checking
@@ -224,6 +277,13 @@ do
 	end)
 	LKS.frame:RegisterEvent("CHAT_MSG_ADDON")
 	LKS.frame:RegisterEvent("CHALLENGE_MODE_COMPLETED")
+	-- On Sirus the Mythic+ events are Lua-side "custom" events fired through
+	-- FireCustomClientEvent; they only reach frames registered with
+	-- RegisterCustomEvent (SharedXML/Utils/CustomEvents.lua).
+	if LKS.frame.RegisterCustomEvent then
+		LKS.frame:RegisterCustomEvent("CHALLENGE_MODE_COMPLETED")
+		LKS.frame:RegisterCustomEvent("MYTHIC_PLUS_OWNED_KEYSTONE_UPDATE")
+	end
 end
 
 do
@@ -233,10 +293,12 @@ do
 	}
 	local statusCheckTable = {
 		GUILD = IsInGuild,
-		PARTY = IsInGroup,
+		PARTY = IsInGroup or function()
+			return (GetNumRaidMembers and GetNumRaidMembers() > 0) or (GetNumPartyMembers and GetNumPartyMembers() > 0)
+		end,
 	}
 	local timers = {}
-	local pName = UnitNameUnmodified("player")
+	local pName = (UnitNameUnmodified or UnitName)("player")
 	function LKS.Request(channel)
 		if not throttleSendTable[channel] then
 			error("LibKeystone: The function lib.Request expects a channel type of PARTY or GUILD.")
