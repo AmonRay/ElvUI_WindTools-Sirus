@@ -79,7 +79,7 @@
 - `GetQuestTagInfo` (Questie реализует сам из таблицы данных `QuestTag[questId]`);
 - `IsQuestFlaggedCompleted`/`IsQuestFlaggedCompletedOnAccount` как вызываемые (Questie сам трекает завершения из событий) — чекер деградирует в `false`;
 - `GetProfessions`, `GetProfessionInfo`, `GetServerTime`;
-- `C_CVar`, `C_Item`, `C_Container`, `C_Map`, `C_Spell`, `C_BattleNet`, `C_ChallengeMode`, `C_MythicPlus`, `C_ScenarioInfo` (целиком namespace'ы).
+- ~~`C_CVar`, `C_Item`, `C_Container`, `C_Map`, `C_Spell`, `C_BattleNet`, `C_ChallengeMode`, `C_MythicPlus`, `C_ScenarioInfo` (целиком namespace'ы).~~ **Неверно** — см. раздел «Sirus compat audit» ниже: `C_Item`/`C_Map`/`C_ChallengeMode`/`C_MythicPlus` на Sirus есть, но частичные; `C_CVar`/`C_AddOns` — PrivateNamespace (не глобальны). Проверять нужно конкретные методы, а не namespace.
 
 `Core/CompatibilityLayer.lua` переписан на **call-time резолвинг**: каждый accessor обращается к `_G` в момент вызова (поздняя регистрация API клиентом больше не проблема), имена методов приведены к документированным (`GetQuestInfo` вместо `GetInfo` и т.п.), фейковые `function() return nil end`-фолбэки убраны — отсутствие API возвращается как `nil` и обрабатывается в точке вызова.
 
@@ -449,3 +449,46 @@
 `APIDocumentation` клиента перечисляет `Scale:SetScaleFrom/SetScaleTo`, но в рантайме их нет — клиент сам пользуется классическим `scale1:SetScale(2, 2)` (Custom_PVPUI.lua:1836), то есть **множителем** относительно текущего масштаба на старте. В `Modules/Combat/RaidMarkers.lua` (OnEnter/OnLeave ховера-анимации) вызовы обёрнуты в guard: retail-путь сохранён, фолбэк — `SetScale(to, to)`; корректность обеспечивает OnPlay-скрипт группы, сбрасывающий масштаб текстуры в 1 перед проигрыванием (множитель = абсолютная цель). `CombatAlert` уже был на классическом `SetChange` — не тронут.
 
 Паттерн подтверждается второй раз: **документация клиента ≠ рантайм** — сверять каждый виджет-метод нужно с фактическим использованием в patch-источниках (grep по FrameXML/SharedXML), а не с APIDocumentation.
+---
+
+# Sirus compat audit (ветка `sirus-compat`)
+
+Источники: исходники клиента Sirus (`Interface/FrameXML`, `SharedXML`), ElvUI-for-Sirus 9.09.02 (у пользователя локально 9.05 + ElvUI_OptionsUI — расхождение версий), mock-харнесс загрузки (TOC-порядок, события, обход 3071 узла AceConfig).
+
+## Карта API (проверено по исходникам Sirus)
+
+| API | Sirus | Решение |
+|---|---|---|
+| `C_Timer` | `C_TimerAugment.lua`: `C_Timer:After`/`C_Timer:NewTicker` (через `:`), `C_Timer.NewTimer` (через `.`), поверх нативного `C_Timer2` | обёртки в CompatibilityLayer с правильной конвенцией вызова |
+| Кастомные события | `FireCustomClientEvent` доходит только до фреймов с `RegisterCustomEvent` (`CHALLENGE_MODE_*`, `MYTHIC_PLUS_*`, `GET_ITEM_INFO_RECEIVED`) | авто-`RegisterCustomEvent` в AceEvent-обёртке; LibRangeCheck/LibKeystone явно |
+| `GROUP_ROSTER_UPDATE` | нет (3.3.5) | алиас → `PARTY_MEMBERS_CHANGED` + `RAID_ROSTER_UPDATE` |
+| Mythic+ | `C_MythicPlus.GetOwnedKeystoneLevel/ChallengeMapID` (может быть nil), `C_ChallengeMode.GetOverallDungeonScore`, `GetMapUIInfo`; нет `RequestCurrentAffixes`, `C_PlayerInfo.GetPlayerMythicPlusRatingSummary` | LibKeystone/KeystoneInfo адаптированы; тултип-рейтинг и premade-M+ отключены |
+| CombatLog | Wrath-формат `COMBAT_LOG_EVENT_UNFILTERED` (аргументы события, без `CombatLogGetCurrentEventInfo`) | используется существующий 3.3.5-путь |
+| Menu | `Menu`/`MenuUtil` есть, но UnitPopup — legacy UIDropDownMenu | ContextMenu грузится, но инертен; Contacts работает |
+| ScrollBox/DataProvider, EventRegistry | есть | без изменений |
+| `MuteSoundFile`, `C_ContentTracking`, `C_CooldownViewer`, `C_MountJournal.GetMountIDs`, `UnitNameUnmodified`, `securecallfunction` | нет | гейт по возможностям / фолбэки |
+| `C_AddOns`, `C_CVar` | PrivateNamespace | глобальные Wrath-функции |
+| `WOW_PROJECT_ID` | nil | не используется для детекта |
+
+События retail без аналога (регистрируются молча, не срабатывают): `ITEM_CHANGED`, `INSPECT_READY`, `LOOT_READY`, `QUEST_WATCH_LIST_CHANGED`, `SCENARIO_*`, `PLAYER_AVG_ITEM_LEVEL_UPDATE`, `ENCOUNTER_*`, `COVENANT_CHOSEN`, `NEW_TOY_ADDED`, `TRAIT_*`, `UNIT_SPEC`, `ACTIVE_PLAYER_SPECIALIZATION_CHANGED`, `USER_WAYPOINT_UPDATED`, `VIGNETTE_MINIMAP_UPDATED`, `CHAT_MSG_ADDON_LOGGED`, `PLAYER_PVP_TALENT_UPDATE`.
+
+## Статус модулей (после sirus-compat)
+
+| Модуль | Статус | Примечание |
+|---|---|---|
+| Core / Options | работает (харнесс) | обход всех опций без ошибок; недоступные функции выключены с пояснением |
+| GameBar | исправлен | VirtualDT поддерживает `SetText` (Time/Friends/System ElvUI-Sirus) |
+| KeystoneInfo / LibKeystone | адаптирован | Sirus M+ API, кастомные события |
+| LibRangeCheck | адаптирован | `GET_ITEM_INFO_RECEIVED` через custom event |
+| Math | частично | kanji-аббревиатуры скрыты (нет `E.Abbreviate` в ElvUI-Sirus) |
+| Profiles (импорт) | исправлен | парсинг без retail-хелперов |
+| LFGList | отключён | нет premade M+ API |
+| MythicPlus (тултип) | отключён | нет rating summary |
+| Progression, ObjectiveProgress, AchievementTracker, PreyHunt, SuperTracker, SpellActivationAlert, CooldownViewer skin | отключены | нет требуемого API; опции показывают причину |
+| ContextMenu | инертен | UnitPopup на legacy-меню |
+| Contacts | работает | |
+| Skins | требует проверки в клиенте | харнесс не моделирует реальные фреймы |
+
+## Ограничения
+- Проверка выполнена на mock-харнессе и по исходникам; обязательна проверка в клиенте: вход, `/reload`, опции, бой, смена зоны.
+- Обёртки событий ставятся на AceEvent текущей версии; апгрейд AceEvent другой копией после загрузки может их снять.
