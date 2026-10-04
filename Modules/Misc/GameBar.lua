@@ -481,20 +481,29 @@ local VirtualDTEvent = {
 	Time = "UPDATE_INSTANCE_INFO",
 }
 
+-- Stand-ins for ElvUI datatext panels. ElvUI-Sirus datatexts write through
+-- both self.text:SetText (Time, Guild) and self.text:SetFormattedText (Friends,
+-- System, Guild), so every virtual text needs both methods.
 local VirtualDT = {
 	Friends = {
 		name = "Friends",
 		text = {
 			SetFormattedText = E.noop,
+			SetText = E.noop,
 		},
 	},
 	System = {
 		name = "System",
+		text = {
+			SetFormattedText = E.noop,
+			SetText = E.noop,
+		},
 	},
 	Time = {
 		name = "Time",
 		text = {
 			SetFormattedText = E.noop,
+			SetText = E.noop,
 		},
 	},
 	Guild = {
