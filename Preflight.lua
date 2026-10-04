@@ -699,10 +699,11 @@ if textureMethods then
 		local r1, g1, b1, a1 = colorToParts(first)
 		local r2, g2, b2, a2 = colorToParts(second)
 		if r1 and r2 then
-			if type(nativeSetGradient) == "function" then
-				return nativeSetGradient(self, orientation, r1, g1, b1, r2, g2, b2)
-			elseif type(nativeSetGradientAlpha) == "function" then
+			-- SetGradientAlpha keeps the ColorMixin alpha; plain SetGradient drops it.
+			if type(nativeSetGradientAlpha) == "function" then
 				return nativeSetGradientAlpha(self, orientation, r1, g1, b1, a1, r2, g2, b2, a2)
+			elseif type(nativeSetGradient) == "function" then
+				return nativeSetGradient(self, orientation, r1, g1, b1, r2, g2, b2)
 			end
 			return self:SetVertexColor(r1, g1, b1)
 		end
