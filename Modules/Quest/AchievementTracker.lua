@@ -1129,8 +1129,9 @@ function AT:Construct()
 	ScrollFrame:Point("TOPLEFT", ControlFrame2, "BOTTOMLEFT", 0, -8)
 	ScrollFrame:Point("TOPRIGHT", ControlFrame2, "BOTTOMRIGHT", 0, -8)
 	ScrollFrame:Point("BOTTOM", MainFrame, "BOTTOM", 0, 8)
-	ScrollFrame:SetClipsChildren(true)
-	ScrollFrame:SetFading(true)
+	-- A 3.3.5a ScrollFrame already clips its scroll child; SetClipsChildren and
+	-- SetFading do not exist on this client (ScrollFrame has its own method table,
+	-- so the Preflight Frame shims do not reach it).
 	MainFrame.ScrollFrame = ScrollFrame
 
 	local ScrollContent = CreateFrame("Frame", nil, ScrollFrame)
