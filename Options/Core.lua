@@ -177,6 +177,9 @@ function W:OptionsCallback()
 		}
 	end
 
+	-- Features the client cannot run keep visible but disabled options.
+	W:ApplyUnavailableFeatureOptions(E.Options.args.WindTools)
+
 	-- Data warmup
 	async.WithItemIDTable(E.db.WT.item.extraItemsBar.blackList, "key")
 	async.WithItemIDTable(E.db.WT.item.extraItemsBar.customList, "value")

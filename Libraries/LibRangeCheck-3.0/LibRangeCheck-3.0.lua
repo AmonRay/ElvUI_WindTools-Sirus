@@ -4553,6 +4553,12 @@ function lib:processItemRequests(itemRequests)
         pendingItemRequest[item] = true
         if not self.frame:IsEventRegistered("GET_ITEM_INFO_RECEIVED") then
           self.frame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+          -- Sirus: GetItemInfo is a Lua cache (SharedXML/Utils/C_Item.lua) that fires
+          -- GET_ITEM_INFO_RECEIVED via FireCustomClientEvent; it only reaches frames
+          -- registered with RegisterCustomEvent.
+          if not self.frame:IsEventRegistered("GET_ITEM_INFO_RECEIVED") and self.frame.RegisterCustomEvent then
+            self.frame:RegisterCustomEvent("GET_ITEM_INFO_RECEIVED")
+          end
         end
         return true
       elseif GetTime() >= itemRequestTimeoutAt[item] then
@@ -4595,6 +4601,9 @@ function lib:initialOnUpdate()
   end
   self.frame:Hide()
   self.frame:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
+  if self.frame.UnregisterCustomEvent then
+    self.frame:UnregisterCustomEvent("GET_ITEM_INFO_RECEIVED")
+  end
 end
 
 function lib:scheduleInit()

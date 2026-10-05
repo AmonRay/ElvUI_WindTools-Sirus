@@ -43,6 +43,10 @@ options.general = {
 			type = "toggle",
 			name = L["Math Without Kanji"],
 			desc = L["Use alphabet rather than kanji (Only for Chinese players)"],
+			-- ElvUI-Sirus has no abbreviate configs; its CHINESE style already uses Y/W.
+			hidden = function()
+				return type(E.BuildAbbreviateConfigs) ~= "function"
+			end,
 		},
 		disableTalkingHead = {
 			order = 3,

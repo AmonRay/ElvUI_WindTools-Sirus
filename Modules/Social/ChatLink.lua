@@ -5,6 +5,7 @@ local CL = W:NewModule("ChatLink") ---@class ChatLink : AceModule
 local _G = _G
 local format = format
 local gsub = gsub
+local next = next
 local pairs = pairs
 local select = select
 local strmatch = strmatch
@@ -15,17 +16,57 @@ local GetAchievementInfo = GetAchievementInfo
 local GetItemInfo = GetItemInfo
 local GetTalentInfo = GetTalentInfo
 
--- Wrath talent hyperlinks carry the talent tree and the talent index inside it
--- (GetTalentLink -> "|Htalent:tabIndex:talentIndex|h"), not a global talentID, and
--- this client ships neither GetTalentInfoByID nor GetPvpTalentInfoByID.
+local GetNumTalentTabs = GetNumTalentTabs
+local GetNumTalents = GetNumTalents
+local GetTalentLink = GetTalentLink
+
+-- 3.3.5a talent hyperlinks are "|Htalent:talentID:rank|h" (rank is -1 for an
+-- unlearned talent), and the client has no GetTalentInfoByID. GetTalentInfo only
+-- takes (tabIndex, talentIndex), so the player's own talents are mapped from
+-- GetTalentLink once. Links of other classes stay without an icon. A
+-- "tabIndex:talentIndex" payload is still accepted as a fallback.
+local talentIDToIndex
+local function GetTalentIndexByID(talentID)
+	if not talentIDToIndex then
+		talentIDToIndex = {}
+		if GetNumTalentTabs and GetNumTalents and GetTalentLink then
+			for tabIndex = 1, GetNumTalentTabs() or 0 do
+				for talentIndex = 1, GetNumTalents(tabIndex) or 0 do
+					local id = tonumber(strmatch(GetTalentLink(tabIndex, talentIndex) or "", "Htalent:(%d+)"))
+					if id then
+						talentIDToIndex[id] = { tabIndex, talentIndex }
+					end
+				end
+			end
+		end
+		if not next(talentIDToIndex) then
+			talentIDToIndex = nil -- talents not loaded yet, retry next time
+			return
+		end
+	end
+	local entry = talentIDToIndex[talentID]
+	if entry then
+		return entry[1], entry[2]
+	end
+end
+
 local function GetTalentTextureFromLink(link)
-	local tabIndex, talentIndex = strmatch(link, "Htalent:(%d+):(%d+)")
-	if not (tabIndex and talentIndex) then
+	local first, second = strmatch(link, "Htalent:(%d+):(%-?%d+)")
+	first, second = tonumber(first), tonumber(second)
+	if not first then
+		return
+	end
+
+	local tabIndex, talentIndex = GetTalentIndexByID(first)
+	if not tabIndex and second and second > 0 and first <= 3 then
+		tabIndex, talentIndex = first, second
+	end
+	if not tabIndex then
 		return
 	end
 
 	-- GetTalentInfo(tabIndex, talentIndex) -> name, icon, tier, column, rank, ...
-	return select(2, GetTalentInfo(tonumber(tabIndex), tonumber(talentIndex)))
+	return select(2, GetTalentInfo(tabIndex, talentIndex))
 end
 
 -- The client exposes C_Item.GetItemName(itemLocation), not the retail
@@ -321,7 +362,7 @@ function CL:Filter(event, msg, ...)
 		msg = gsub(msg, "(|Hcurrency:%d+:.-|h.-|h)", AddCurrencyInfo)
 		msg = gsub(msg, "(|Hspell:%d+:%d+|h.-|h)", AddSpellInfo)
 		msg = gsub(msg, "(|Henchant:%d+|h.-|h)", AddEnchantInfo)
-		msg = gsub(msg, "(|Htalent:%d+:%d+|h.-|h)", AddTalentInfo)
+		msg = gsub(msg, "(|Htalent:%d+:%-?%d+|h.-|h)", AddTalentInfo)
 		msg = gsub(msg, "(|Hachievement:%d+:.-|h.-|h)", AddAchievementInfo)
 	end
 	return false, msg, ...

@@ -1,7 +1,11 @@
 local W, F, E = unpack((select(2, ...))) ---@type WindTools, Functions, ElvUI
 
 local _G = _G
+local hooksecurefunc = hooksecurefunc
+local ipairs = ipairs
 local pairs = pairs
+local select = select
+local setmetatable = setmetatable
 local sort = sort
 local strsub = strsub
 local tinsert = tinsert
@@ -130,24 +134,38 @@ end
 Compatibility.IsQuestFlaggedCompleted = makeQuestCompletedChecker("IsQuestFlaggedCompleted")
 Compatibility.IsQuestFlaggedCompletedOnAccount = makeQuestCompletedChecker("IsQuestFlaggedCompletedOnAccount")
 
--- C_Timer is present on this client (UITimerDocumentation; ElvUI calls
--- C_Timer:NewTicker/NewTimer/After directly). The wrapper accepts both the
--- retail (seconds, callback) and 4.x-style (seconds, iterations, callback) forms.
-local function bindTimerMethod(method)
+-- C_Timer on Sirus is implemented in Lua (SharedXML/C_TimerAugment.lua) with
+-- MIXED calling conventions, unlike retail where everything is a dot call:
+--   function C_Timer:After(duration, callback)                 -- colon
+--   function C_Timer:NewTicker(duration, callback, iterations) -- colon
+--   function C_Timer.NewTimer(duration, callback)              -- dot
+-- Calling them with the wrong convention shifts the arguments and corrupts the
+-- timer queue (compare errors inside its OnUpdate). These wrappers expose the
+-- retail dot-call signatures and pick the right convention per method: if the
+-- first parameter of the Sirus function is the namespace, pass C_Timer as self.
+local function bindTimerMethod(method, isColonMethod)
 	local timer = _G.C_Timer
 	if not timer or type(timer[method]) ~= "function" then
 		return nil
 	end
 	local timerMethod = timer[method]
-	return function(first, second, ...)
-		if type(first) == "number" then
-			return timerMethod(timer, first, second, ...)
+	if isColonMethod then
+		return function(duration, callback, ...)
+			return timerMethod(timer, duration, callback, ...)
 		end
-		return timerMethod(timer, second, first, ...)
+	end
+	return function(duration, callback, ...)
+		return timerMethod(duration, callback, ...)
 	end
 end
-Compatibility.NewTicker = bindTimerMethod("NewTicker")
-Compatibility.NewTimer = bindTimerMethod("NewTimer")
+-- Retail (native C_Timer): all dot. Sirus: After/NewTicker colon, NewTimer dot.
+-- The Sirus Lua augment wraps the native C_Timer2 table, so its presence
+-- identifies the Sirus convention.
+local isSirusTimer = type(_G.C_Timer2) == "table"
+Compatibility.IsSirusTimer = isSirusTimer
+Compatibility.NewTicker = bindTimerMethod("NewTicker", isSirusTimer)
+Compatibility.After = bindTimerMethod("After", isSirusTimer)
+Compatibility.NewTimer = bindTimerMethod("NewTimer", false)
 
 -- Specializations. This client ships C_SpecializationInfo with an EMPTY function
 -- table (per APIDocumentation) and no GetSpecialization / GetInspectSpecialization
@@ -263,27 +281,58 @@ Compatibility.IsCosmeticItem = function(itemID)
 end
 
 -- Capability probes (resolved at load; used to gate retail-only modules).
-local function isNativeNamespace(name)
-	local api = _G[name]
-	return type(api) == "table"
+-- Sirus defines many retail-named namespaces in Lua with only a subset of the
+-- retail methods (e.g. C_Container only has sort/flag helpers, C_Map only
+-- GetAreaNameByID/GetParentMapID, C_Spell only IsSpellCrowdControl/
+-- IsSpellImportant, C_MountJournal/C_ToyBox are Sirus collection backends).
+-- A namespace table therefore proves nothing; probe the method a module needs.
+local function hasMethod(namespace, method)
+	local api = _G[namespace]
+	return type(api) == "table" and type(api[method]) == "function"
 end
+local function isNativeNamespace(name)
+	return type(_G[name]) == "table"
+end
+Compatibility.HasMethod = hasMethod
 
 Compatibility.HasTimerAPI = type(_G.C_Timer) == "table" and type(_G.C_Timer.NewTicker) == "function" and type(_G.C_Timer.NewTimer) == "function"
-Compatibility.HasModernContainers = isNativeNamespace("C_Container")
-Compatibility.HasModernItemAPI = isNativeNamespace("C_Item") and type(_G.C_Item.GetItemInfo) == "function"
-Compatibility.HasModernSpellAPI = isNativeNamespace("C_Spell")
+Compatibility.HasModernContainers = hasMethod("C_Container", "GetContainerNumSlots") and hasMethod("C_Container", "GetContainerItemInfo")
+Compatibility.HasModernItemAPI = hasMethod("C_Item", "GetItemInfo")
+Compatibility.HasModernSpellAPI = hasMethod("C_Spell", "GetSpellInfo")
 Compatibility.HasLegacyQuestAPI = type(_G.GetNumQuestLogEntries) == "function"
 Compatibility.HasLegacyTooltipAPI = type(_G.GameTooltip) == "table"
-Compatibility.HasModernMapAPI = isNativeNamespace("C_Map") and type(_G.C_Map.GetBestMapForUnit) == "function"
-Compatibility.HasModernQuestAPI = isNativeNamespace("C_QuestLog") and type(_G.C_QuestLog.GetQuestInfo) == "function"
-Compatibility.HasTooltipDataProcessor = type(_G.TooltipDataProcessor) == "table" and type(_G.TooltipDataProcessor.AddTooltipPostCall) == "function"
-Compatibility.HasChallengeModeAPI = isNativeNamespace("C_ChallengeMode")
-Compatibility.HasMythicPlusAPI = isNativeNamespace("C_MythicPlus")
+Compatibility.HasModernMapAPI = hasMethod("C_Map", "GetBestMapForUnit")
+Compatibility.HasModernQuestAPI = hasMethod("C_QuestLog", "GetQuestInfo")
+Compatibility.HasTooltipDataProcessor = hasMethod("TooltipDataProcessor", "AddTooltipPostCall")
+-- Sirus ships a Lua Mythic+ system (FrameXML/Utils/C_Mythic.lua) with the
+-- retail names for keystones, map info and dungeon score.
+Compatibility.HasChallengeModeAPI = hasMethod("C_ChallengeMode", "GetMapUIInfo")
+Compatibility.HasMythicPlusAPI = hasMethod("C_MythicPlus", "GetOwnedKeystoneLevel")
+-- Retail-only per-player rating summary (used by the M+ tooltip module).
+Compatibility.HasMythicPlusRatingAPI = hasMethod("C_PlayerInfo", "GetPlayerMythicPlusRatingSummary")
 Compatibility.HasBattleNetAPI = isNativeNamespace("C_BattleNet")
 Compatibility.HasClubAPI = isNativeNamespace("C_Club")
 Compatibility.HasModernSocialAPI = Compatibility.HasBattleNetAPI or Compatibility.HasClubAPI
-Compatibility.HasModernUnitAPI = type(_G.UnitHealthPercent) == "function" and type(_G.UnitGetTotalAbsorbs) == "function"
-Compatibility.HasModernCollectionsAPI = isNativeNamespace("C_MountJournal") or isNativeNamespace("C_ToyBox")
+-- Preflight.lua installs stand-ins for missing globals; probes must see the client.
+local preflightShimmed = type(_G.WindToolsPreflight) == "table" and _G.WindToolsPreflight.Shimmed or {}
+local function isNativeFunction(name)
+	return type(_G[name]) == "function" and not preflightShimmed[name]
+end
+Compatibility.IsNativeFunction = isNativeFunction
+
+Compatibility.HasModernUnitAPI = isNativeFunction("UnitHealthPercent") and isNativeFunction("UnitGetTotalAbsorbs")
+Compatibility.HasModernCollectionsAPI = hasMethod("C_MountJournal", "GetMountIDs") and hasMethod("C_ToyBox", "GetToyInfo")
+-- Retail achievement/content tracking (10.1+); Sirus uses the legacy
+-- AddTrackedAchievement API and has no Constants.ContentTrackingConsts.
+Compatibility.HasContentTrackingAPI = hasMethod("C_ContentTracking", "GetTrackedIDs")
+	and type(_G.Constants) == "table" and type(_G.Constants.ContentTrackingConsts) == "table"
+-- Retail premade groups with M+ affix requests (LFGList module). Sirus has its
+-- own C_MythicPlus without RequestCurrentAffixes.
+Compatibility.HasPremadeMythicPlusAPI = hasMethod("C_MythicPlus", "RequestCurrentAffixes") and hasMethod("C_LFGList", "GetSearchResultInfo")
+-- Retail cooldown manager (Blizzard_CooldownViewer, 11.1+).
+Compatibility.HasCooldownViewerAPI = type(_G.C_CooldownViewer) == "table"
+-- MuteSoundFile/UnmuteSoundFile (8.2+) do not exist on 3.3.5a/Sirus.
+Compatibility.HasSoundFileMuteAPI = isNativeFunction("MuteSoundFile") and isNativeFunction("UnmuteSoundFile")
 Compatibility.HasModernSettingsAPI = type(_G.Settings) == "table"
 -- Retail scroll box helpers (CreateDataProvider / CreateScrollBoxListLinearView)
 -- are absent on this client. WindTools builds its lists on the native ScrollFrame
@@ -357,5 +406,139 @@ function Compatibility:GetCapabilityReport()
 
 	return report
 end
+-- ---------------------------------------------------------------------------
+-- Event compatibility for AceEvent-embedded WindTools objects (W + modules).
+--
+-- 1. Aliases: retail events that have a direct 3.3.5a equivalent with the same
+--    meaning and no payload. GROUP_ROSTER_UPDATE (5.0+) was split into
+--    PARTY_MEMBERS_CHANGED + RAID_ROSTER_UPDATE on Wrath (ElvUI-Sirus itself
+--    registers those two). Handlers still receive the retail event name.
+-- 2. Sirus custom events: Sirus fires its Lua-implemented events (Mythic+,
+--    GET_ITEM_INFO_RECEIVED from its C_Item cache, ...) through
+--    FireCustomClientEvent, which only reaches frames registered with
+--    frame:RegisterCustomEvent (SharedXML/Utils/CustomEvents.lua). AceEvent only
+--    calls RegisterEvent, so such events never arrive. If the client did not
+--    accept the event natively, also register it as a custom event on the
+--    AceEvent frame - the same approach ElvUI-Sirus uses in
+--    E:RegisterEventForObject (Core/General/Core.lua).
+-- ---------------------------------------------------------------------------
+local EventAliases = {
+	GROUP_ROSTER_UPDATE = { "PARTY_MEMBERS_CHANGED", "RAID_ROSTER_UPDATE" },
+}
+Compatibility.EventAliases = EventAliases
+
+local AceEvent = _G.LibStub and _G.LibStub("AceEvent-3.0", true)
+local aceEventFrame = AceEvent and AceEvent.frame
+
+local function EnsureClientDelivery(event)
+	if not aceEventFrame or aceEventFrame:IsEventRegistered(event) then
+		return
+	end
+	if aceEventFrame.RegisterCustomEvent then
+		aceEventFrame:RegisterCustomEvent(event)
+	end
+end
+Compatibility.EnsureClientDelivery = EnsureClientDelivery
+
+-- proxies[target][aliasEvent] = proxy object used as the AceEvent "self" for
+-- the real events, so the target can still register those real events itself.
+local proxies = setmetatable({}, { __mode = "k" })
+
+local function GetProxy(target, event)
+	local byEvent = proxies[target]
+	if not byEvent then
+		byEvent = {}
+		proxies[target] = byEvent
+	end
+	local proxy = byEvent[event]
+	if not proxy then
+		proxy = {}
+		byEvent[event] = proxy
+	end
+	return proxy
+end
+
+local function PatchEventTarget(target)
+	if type(target) ~= "table" or target.__windEventCompat or type(target.RegisterEvent) ~= "function" or not AceEvent then
+		return
+	end
+	target.__windEventCompat = true
+
+	local originalRegister = target.RegisterEvent
+	local originalUnregister = target.UnregisterEvent
+	local originalUnregisterAll = target.UnregisterAllEvents
+
+	target.RegisterEvent = function(self, event, callback, ...)
+		local realEvents = EventAliases[event]
+		if not realEvents then
+			originalRegister(self, event, callback, ...)
+			EnsureClientDelivery(event)
+			return
+		end
+
+		local hasArg = select("#", ...) > 0
+		local arg = ...
+		local relay
+		if type(callback) == "function" then
+			relay = function(_, ...)
+				if hasArg then
+					callback(arg, event, ...)
+				else
+					callback(event, ...)
+				end
+			end
+		else
+			local method = callback or event
+			relay = function(_, ...)
+				local handler = self[method]
+				if type(handler) == "function" then
+					handler(self, event, ...)
+				end
+			end
+		end
+
+		local proxy = GetProxy(self, event)
+		for _, realEvent in ipairs(realEvents) do
+			AceEvent.RegisterEvent(proxy, realEvent, relay)
+		end
+	end
+
+	target.UnregisterEvent = function(self, event, ...)
+		local realEvents = EventAliases[event]
+		if not realEvents then
+			return originalUnregister(self, event, ...)
+		end
+		local byEvent = proxies[self]
+		local proxy = byEvent and byEvent[event]
+		if proxy then
+			for _, realEvent in ipairs(realEvents) do
+				AceEvent.UnregisterEvent(proxy, realEvent)
+			end
+		end
+	end
+
+	if originalUnregisterAll then
+		target.UnregisterAllEvents = function(self, ...)
+			local byEvent = proxies[self]
+			if byEvent then
+				for _, proxy in pairs(byEvent) do
+					AceEvent.UnregisterAllEvents(proxy)
+				end
+			end
+			return originalUnregisterAll(self, ...)
+		end
+	end
+end
+Compatibility.PatchEventTarget = PatchEventTarget
+
+-- W and the modules pre-registered in Initialize.lua already exist; modules
+-- created later (every Modules/* file) are patched right after NewModule.
+PatchEventTarget(W)
+for _, module in W:IterateModules() do
+	PatchEventTarget(module)
+end
+hooksecurefunc(W, "NewModule", function(self, name)
+	PatchEventTarget(self:GetModule(name, true))
+end)
 
 W.Compatibility = Compatibility

@@ -1,5 +1,6 @@
 -- WindTools preflight compatibility for libraries loaded before Initialize.lua.
 -- Do not create or mutate Blizzard C_* namespaces: libraries are feature-gated instead.
+-- Probe methods, not namespaces: Sirus defines partial C_* tables in Lua.
 --
 -- This file also installs the legacy *global function* shims that the modified
 -- 3.3.5a client is missing. It is deliberately loaded first (see the .toc) so the
@@ -21,9 +22,15 @@ end
 ---Installs a global function only when the client does not provide it.
 ---@param name string global identifier
 ---@param fn function implementation
+-- Names installed here, so capability probes (Core/CompatibilityLayer.lua) can
+-- tell a native API from a WindTools stand-in: several shims below are inert
+-- stubs (MuteSoundFile, UnitGetTotalAbsorbs, ...) and must not make a feature
+-- look available.
+local shimmed = {}
 local function shim(name, fn)
 	if type(_G[name]) ~= "function" then
 		_G[name] = fn
+		shimmed[name] = true
 	end
 end
 
@@ -692,10 +699,11 @@ if textureMethods then
 		local r1, g1, b1, a1 = colorToParts(first)
 		local r2, g2, b2, a2 = colorToParts(second)
 		if r1 and r2 then
-			if type(nativeSetGradient) == "function" then
-				return nativeSetGradient(self, orientation, r1, g1, b1, r2, g2, b2)
-			elseif type(nativeSetGradientAlpha) == "function" then
+			-- SetGradientAlpha keeps the ColorMixin alpha; plain SetGradient drops it.
+			if type(nativeSetGradientAlpha) == "function" then
 				return nativeSetGradientAlpha(self, orientation, r1, g1, b1, a1, r2, g2, b2, a2)
+			elseif type(nativeSetGradient) == "function" then
+				return nativeSetGradient(self, orientation, r1, g1, b1, r2, g2, b2)
 			end
 			return self:SetVertexColor(r1, g1, b1)
 		end
@@ -754,15 +762,16 @@ end)
 
 _G.WindToolsPreflight = {
 	HasTimerAPI = has("C_Timer", "NewTicker"),
-	HasContainerAPI = has("C_Container"),
-	HasItemAPI = has("C_Item"),
-	HasSpellAPI = has("C_Spell"),
+	HasContainerAPI = has("C_Container", "GetContainerNumSlots"),
+	HasItemAPI = has("C_Item", "GetItemInfo"),
+	HasSpellAPI = has("C_Spell", "GetSpellInfo"),
 	HasMapAPI = has("C_Map", "GetBestMapForUnit"),
 	HasQuestAPI = has("C_QuestLog", "GetInfo"),
 	HasTooltipAPI = has("TooltipDataProcessor", "AddTooltipPostCall"),
-	HasChallengeAPI = has("C_ChallengeMode"),
-	HasMythicPlusAPI = has("C_MythicPlus"),
+	HasChallengeAPI = has("C_ChallengeMode", "GetMapUIInfo"),
+	HasMythicPlusAPI = has("C_MythicPlus", "GetOwnedKeystoneLevel"),
 	HasModernCinematicAPI = type(_G.EventRegistry) == "table" and type(_G.MovieFrame_PlayMovie) == "function" and type(_G.Enum) == "table" and type(_G.Enum.CinematicType) == "table",
 	HasSpellActivationOverlay = type(_G.SpellActivationOverlayFrame) == "table" and type(_G.SpellActivationOverlayFrame.ShowOverlay) == "function",
 	OpenRaid = _G.WindTools_OpenRaidEnabled,
+	Shimmed = shimmed,
 }

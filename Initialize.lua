@@ -97,15 +97,23 @@ W.Utilities = {}
 W.ModuleRequirements = {
 	PreyHunt = { "HasModernQuestAPI", "HasModernMapAPI" },
 	SuperTracker = { "HasModernMapAPI" },
-	MythicPlus = { "HasChallengeModeAPI", "HasMythicPlusAPI" },
+	-- Needs per-unit retail ratings (C_PlayerInfo.GetPlayerMythicPlusRatingSummary);
+	-- Sirus only exposes the player's own score.
+	MythicPlus = { "HasChallengeModeAPI", "HasMythicPlusAPI", "HasMythicPlusRatingAPI" },
 	ObjectiveProgress = { "HasModernQuestAPI" },
-	AchievementTracker = { "HasScrollBoxAPI" },
+	-- Retail premade-group (LFGList) + M+ affix requests; Sirus' LFG/M+ are custom.
+	LFGList = { "HasPremadeMythicPlusAPI" },
+	-- Not a module: Skins/Blizzard/CooldownViewer.lua (retail 11.1 cooldown manager).
+	CooldownViewerSkin = { "HasCooldownViewerAPI" },
 	Icons = { "HasTooltipDataProcessor" },
 	ReshiiWrapsUpgrade = { "HasTooltipDataProcessor" },
 	HideCrafter = { "HasTooltipDataProcessor" },
 	SkipCutScene = { "HasModernCinematicAPI" },
 	SpellActivationAlert = { "HasSpellActivationOverlay" },
-	Progression = { "HasModernCollectionsAPI" },
+	-- Retail raid/M+ statistic IDs and MuteSoundFile (absent on 3.3.5a/Sirus).
+	Progression = { "HasSoundFileMuteAPI" },
+	-- Not a module: Misc/Mute.lua callback; per-file muting does not exist on 3.3.5a.
+	MuteSounds = { "HasSoundFileMuteAPI" },
 }
 
 -- Core/Load_Core.xml is evaluated after this file on the legacy client. The
@@ -113,8 +121,10 @@ W.ModuleRequirements = {
 -- Initialize.lua must not dereference it before Core/CompatibilityLayer.lua.
 W.Compatibility = W.Compatibility or {}
 W.Compatibility.HasLegacyQuestAPI = type(GetNumQuestLogEntries) == "function"
-W.Compatibility.HasModernSpellAPI = type(_G.C_Spell) == "table"
-W.Compatibility.HasModernMapAPI = type(_G.C_Map) == "table"
+-- Method probes (Sirus defines partial C_Spell/C_Map tables); kept in sync with
+-- Core/CompatibilityLayer.lua, which replaces this table.
+W.Compatibility.HasModernSpellAPI = type(_G.C_Spell) == "table" and type(_G.C_Spell.GetSpellInfo) == "function"
+W.Compatibility.HasModernMapAPI = type(_G.C_Map) == "table" and type(_G.C_Map.GetBestMapForUnit) == "function"
 
 -- Pre-register libs into ElvUI
 E:AddLib("Deflate", "LibDeflate")

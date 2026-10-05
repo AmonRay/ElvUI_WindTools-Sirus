@@ -102,20 +102,21 @@ do
 	local GetContainerNumSlots, GetContainerItemID, GetContainerItemLink = C_Container and C_Container.GetContainerNumSlots, C_Container and C_Container.GetContainerItemID, C_Container and C_Container.GetContainerItemLink
 	local IsItemKeystoneByID, PlayerIsTimerunning = C_Item and C_Item.IsItemKeystoneByID, PlayerIsTimerunning
 	local strsplit = string.split
+	local floor = math.floor
 	function GetInfo()
 		-- Client-native path first: GetOwnerKeystoneInfo returns the full
 		-- keystone state without bag scanning.
 		if GetOwnerKeystoneInfo then
-			local ok, _, keyChallengeMapID, keyLevel = pcall(GetOwnerKeystoneInfo)
-			if ok then
-				if type(keyLevel) ~= "number" then
-					keyLevel = 0
-				end
-				if type(keyChallengeMapID) ~= "number" then
-					keyChallengeMapID = 0
-				end
-				return keyLevel, keyChallengeMapID, GetPlayerRating()
+			-- Pure Lua on Sirus (C_GlobalStorage read): returns nothing until the
+			-- server pushed ASMSG_CHALLENGE_MODE_KEYSTONE_INFO, never errors.
+			local _, keyChallengeMapID, keyLevel = GetOwnerKeystoneInfo()
+			if type(keyLevel) ~= "number" then
+				keyLevel = 0
 			end
+			if type(keyChallengeMapID) ~= "number" then
+				keyChallengeMapID = 0
+			end
+			return floor(keyLevel), floor(keyChallengeMapID), floor(GetPlayerRating())
 		end
 
 		-- Keystone level
@@ -154,16 +155,47 @@ do
 
 		-- M+ rating
 		local playerRating = GetPlayerRating()
-		return keyLevel, keyChallengeMapID, playerRating
+		return floor(keyLevel), floor(keyChallengeMapID), floor(playerRating)
 	end
 end
 
 local SendAddonMessage = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
-local CTimerNewTimer
-if C_Timer and type(C_Timer.NewTimer) == "function" then
-	local NewTimer = C_Timer.NewTimer
-	CTimerNewTimer = function(delay, callback, ...)
-		return NewTimer(C_Timer, delay, callback, ...)
+-- C_Timer.NewTimer is a plain function (dot call) on retail and on Sirus
+-- (SharedXML/C_TimerAugment.lua: `function C_Timer.NewTimer(duration, callback)`).
+-- Passing C_Timer as the first argument shifts duration/callback and breaks the
+-- Sirus timer queue. Stock 3.3.5a has no C_Timer, so keep a tiny frame fallback.
+local CTimerNewTimer = C_Timer and C_Timer.NewTimer
+if type(CTimerNewTimer) ~= "function" then
+	local timerFrame = CreateFrame("Frame")
+	local pending, due = {}, {}
+	local function Cancel(timer)
+		timer.cancelled = true
+	end
+	timerFrame:Hide()
+	timerFrame:SetScript("OnUpdate", function(self, elapsed)
+		for timer in next, pending do
+			timer.remaining = timer.remaining - elapsed
+			if timer.cancelled then
+				pending[timer] = nil
+			elseif timer.remaining <= 0 then
+				pending[timer] = nil
+				due[#due + 1] = timer
+			end
+		end
+		for i = 1, #due do
+			local timer = due[i]
+			due[i] = nil
+			timer.callback(timer)
+		end
+		if not next(pending) then
+			self:Hide()
+		end
+	end)
+	CTimerNewTimer = function(delay, callback)
+		local timer = { remaining = delay, callback = callback, Cancel = Cancel }
+		pending[timer] = true
+		timerFrame:Show()
+		return timer
 	end
 end
 local GetTime = GetTime
@@ -275,10 +307,20 @@ do
 		elseif event == "ITEM_CHANGED" or (event == "ITEM_PUSH" and msg == 4352494) then -- We automatically broadcast newly received keystones, but only at the end of a Mythic+
 			-- Check if the player got a new keystone from the NPC (ITEM_CHANGED) or the chest (ITEM_PUSH)
 			CTimerNewTimer(1, DidKeystoneChange) -- There can sometimes be delay with the API updating, especially on PTR, so wait 1 second before checking
+		elseif event == "MYTHIC_PLUS_OWNED_KEYSTONE_UPDATE" then -- Sirus pushes keystone changes from the server
+			CTimerNewTimer(1, DidKeystoneChange)
 		end
 	end)
 	LKS.frame:RegisterEvent("CHAT_MSG_ADDON")
-	LKS.frame:RegisterEvent("CHALLENGE_MODE_COMPLETED")
+	-- On Sirus the Mythic+ events are Lua-side "custom" events fired through
+	-- FireCustomClientEvent; they only reach frames registered with
+	-- RegisterCustomEvent (SharedXML/Utils/CustomEvents.lua).
+	if LKS.frame.RegisterCustomEvent then
+		LKS.frame:RegisterCustomEvent("CHALLENGE_MODE_COMPLETED")
+		LKS.frame:RegisterCustomEvent("MYTHIC_PLUS_OWNED_KEYSTONE_UPDATE")
+	else
+		LKS.frame:RegisterEvent("CHALLENGE_MODE_COMPLETED")
+	end
 end
 
 do
