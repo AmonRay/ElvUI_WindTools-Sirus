@@ -159,9 +159,25 @@ local function bindTimerMethod(method, isColonMethod)
 	end
 end
 -- Retail (native C_Timer): all dot. Sirus: After/NewTicker colon, NewTimer dot.
--- The Sirus Lua augment wraps the native C_Timer2 table, so its presence
--- identifies the Sirus convention.
-local isSirusTimer = type(_G.C_Timer2) == "table"
+-- The Sirus Lua augment wraps the native C_Timer2 table, but C_Timer2 is an
+-- upvalue there and is not guaranteed to stay global, so also accept other
+-- Sirus markers. 3.3.5a has no native C_Timer: on a pre-4.0 client a C_Timer
+-- next to Sirus-only APIs is the Lua augment (colon After/NewTicker).
+local function detectSirusTimer()
+	if type(_G.C_Timer2) == "table" then
+		return true
+	end
+	local interfaceVersion = tonumber((select(4, GetBuildInfo()))) or 0
+	if interfaceVersion >= 40000 then
+		return false
+	end
+	if type(_G.C_GlobalStorage) == "table" or type(_G.FireCustomClientEvent) == "function" then
+		return true
+	end
+	local probe = CreateFrame("Frame")
+	return type(probe.RegisterCustomEvent) == "function"
+end
+local isSirusTimer = detectSirusTimer()
 Compatibility.IsSirusTimer = isSirusTimer
 Compatibility.NewTicker = bindTimerMethod("NewTicker", isSirusTimer)
 Compatibility.After = bindTimerMethod("After", isSirusTimer)
