@@ -887,7 +887,7 @@ function AT:Construct()
 	ShowAllButton:Size(80, 25)
 	ShowAllButton:Point("LEFT", ThresholdSlider, "RIGHT", 15, 8)
 	ShowAllButton:SetText(L["All"])
-	F.SetFont(ShowAllButton.Text, E.db.general.font)
+	F.SetFont(ShowAllButton.Text or ShowAllButton:GetFontString(), E.db.general.font)
 	S:Proxy("HandleButton", ShowAllButton)
 	ShowAllButton:SetScript("OnClick", function()
 		self.states.filters.pattern = ""
@@ -904,7 +904,7 @@ function AT:Construct()
 	NearlyCompleteButton:Size(80, 25)
 	NearlyCompleteButton:Point("LEFT", ShowAllButton, "RIGHT", 8, 0)
 	NearlyCompleteButton:SetText("95%+")
-	F.SetFont(NearlyCompleteButton.Text)
+	F.SetFont(NearlyCompleteButton.Text or NearlyCompleteButton:GetFontString())
 	S:Proxy("HandleButton", NearlyCompleteButton)
 	NearlyCompleteButton:SetScript("OnClick", function()
 		self.db.threshold = 95
@@ -1042,6 +1042,12 @@ function AT:Construct()
 	local RewardsCheckButton = CreateFrame("CheckButton", nil, ControlFrame2, "UICheckButtonTemplate")
 	RewardsCheckButton:Size(22)
 	RewardsCheckButton:Point("LEFT", CategorySelectButton, "RIGHT", 12, 0)
+	-- 3.3.5a UICheckButtonTemplate names its label "$parentText" and sets no
+	-- .Text key, so an anonymous check button has no label; create one.
+	if not RewardsCheckButton.Text then
+		RewardsCheckButton.Text = RewardsCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+		RewardsCheckButton.Text:Point("LEFT", RewardsCheckButton, "RIGHT", 1, 1)
+	end
 	RewardsCheckButton.Text:SetText(L["Rewards"])
 	RewardsCheckButton.Text:SetTextColor(1, 1, 1)
 	F.SetFont(RewardsCheckButton.Text)
