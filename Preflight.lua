@@ -712,6 +712,11 @@ if textureMethods then
 		end
 	end
 	ensureWidgetMethod(textureMethods, "SetRotation", function() end)
+	-- 3.3.5a has no SetColorTexture; SetTexture(r, g, b, a) draws the same
+	-- solid color there.
+	ensureWidgetMethod(textureMethods, "SetColorTexture", function(self, r, g, b, a)
+		return self:SetTexture(r, g, b, a or 1)
+	end)
 end
 
 if frameMethods then
